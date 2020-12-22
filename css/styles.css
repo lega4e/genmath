@@ -1,0 +1,40 @@
+
+@font-face
+{
+	font-family: 'mandy';
+	src: url('../resources/mandy.otf');
+}
+
+
+
+html
+{
+	background: #C9C9C9;
+	font-family: 'mandy';
+	font-size: 14pt;
+	hyphens: auto;
+}
+
+body
+{
+	max-width: 750px;
+	min-height: 300px;
+
+	margin: auto;
+	margin-top: 100px;
+	margin-bottom: 300px;
+
+	border: 50px solid transparent;
+	border-radius: 30px;
+
+	background: white;
+}
+
+
+
+h1 { border-bottom: 1px solid gray; }
+
+p { text-align: justify; }
+
+a { color: #05081E; }
+a:hover { color: #1B256C; }
