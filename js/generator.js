@@ -23,7 +23,7 @@ function generate_mo(depth)
 	}
 
 	let op = choice(MOTypeProbs);
-	let len = randint(MOIntervals[op][0], MOIntervals[op][1]);
+	let len = extract_value(MOIntervals[op]);
 
 	let expr = new MultipleOperation;
 	expr.op = op;
@@ -54,9 +54,7 @@ function generate_uo(depth)
 	let expr = new UnaryOperation;
 	expr.op = choice(UOTypeProbs);
 	expr.expr = generate_mo(depth-1);
-	expr.param = UOParams[expr.op] ?
-		randint(UOParams[expr.op][0], UOParams[expr.op][1]) :
-		null;
+	expr.param = extract_value(UOParams[expr.op]);
 
 	return expr;
 }

@@ -41,6 +41,7 @@ const MOLatex = {
 };
 
 
+
 const UOType = {
 	'DIV'  : 'DIV',
 	'POW'  : 'POW',
@@ -89,6 +90,35 @@ const UOLatex = {
 	'SIN'  : '\\sin ( %0 )',
 	'COS'  : '\\cos ( %0 )',
 };
+
+
+/*
+ * Функции передаётся три возможных
+ * набора значений:
+ *
+ * 1. null — в этом случае функция
+ *    возвращает null
+ * 2. Array — тогда функция возвращает
+ *    случайное целое число от ar[0] до
+ *    ar[1] включительно
+ * 3. function, args... — вызывается
+ *    функция, переданное первым аргу-
+ *    ментом, с аргументами args...
+ */
+function extract_value(obj)
+{
+	if(!obj)
+		return null;
+
+	if(Array.isArray(obj))
+		return randint(obj[0], obj[1]);
+
+	let args = [];
+	for(let i = 1; i < arguments.length; ++i) 
+		args.push(arguments[i]);
+
+	return obj.apply(obj, args);
+}
 
 /*
  * В функцию подаётся карта весов, где каждому
