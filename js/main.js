@@ -1,4 +1,13 @@
 
+
+
+window.keypress = function()
+{
+	if(window.event.keyCode == 13)
+		window.generate();
+	return;
+}
+
 window.generate = function()
 {
 	let exprs = [];
