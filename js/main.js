@@ -1,3 +1,9 @@
+/*
+ * autor:    lis
+ * created:  Dec 24 23:32:35 2020
+ */
+
+
 
 
 
@@ -14,9 +20,9 @@ window.generate = function()
 	for(let i = 0; i < 10; ++i) 
 	{
 		let depth = parseInt($('#depth-input').val());
-		console.log(depth);
 
-		let expr = generate_mo(depth);
+		let expr = generate_expression(depth);
+		console.log('\nmain');
 		console.log(expr);
 		let latex = expr.latex();
 		console.log(latex);
@@ -28,3 +34,9 @@ window.generate = function()
 	$('#formula').html(exprs.join(''));
 	MathJax.typeset();
 }
+
+
+
+
+
+/* END */

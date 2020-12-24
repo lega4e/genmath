@@ -2,8 +2,8 @@
  * autor:    lis
  * created:  Dec 21 21:06:39 2020
  *
- * MO — MultipleOperation
- * UO — UnaryOperation
+ * CAO — Commutative and Associative Operation
+ * O — Operation
  */
 
 'use strict'
@@ -12,41 +12,40 @@
 
 
 
-const MOType = {
+const CAOType = {
 	'ADD' : 'ADD',
+	'SUB' : 'SUB',
 	'MUL' : 'MUL',
-	'EXP' : 'EXP',
-	'DIV' : 'DIV',
 };
 
-const MOTypeProbs = {
+const CAOTypeProbs = {
 	'ADD' : 1.0,
+	'SUB' : 1.0,
 	'MUL' : 1.0,
-	'EXP' : 0.1,
-	'DIV' : 0.5,
 };
 
-const MOIntervals = {
+const CAOIntervals = {
 	'ADD' : [2, 3],
-	'MUL' : [1, 3],
-	'EXP' : [2, 2],
-	'DIV' : [2, 2],
+	'SUB' : 2,
+	'MUL' : [2, 3],
 };
 
-const MOLatex = {
+const CAOLatex = {
 	'ADD' : '%0 + %1',
+	'SUB' : '%0 - %1',
 	'MUL' : '%0 %1',
-	'EXP' : '%0 ^ {%1}',
-	'DIV' : '\\frac{ %0 }{ %1 }',
 };
 
 
 
-const UOType = {
+const OType = {
 	'DIV'  : 'DIV',
+	'EXP'  : 'EXP',
+
 	'POW'  : 'POW',
 	'ROOT' : 'ROOT',
-	'EXP'  : 'EXP',
+	'UDIV' : 'UDIV',
+	'UEXP' : 'UEXP',
 	'SIN'  : 'SIN',
 	'COS'  : 'COS',
 	// 'TAN'  : 4,
@@ -57,51 +56,91 @@ const UOType = {
 	// 'ACTG' : 9,
 };
 
-const UOTypeProbs = {
+const OTypeProbs = {
 	'DIV'  : 1.0,
-	'POW'  : 2.0,
-	'ROOT' : 2.0,
 	'EXP'  : 0.5,
+
+	'POW'  : 1.2,
+	'ROOT' : 1.2,
+	'UDIV' : 0.75,
+	'UEXP' : 0.2,
 	'SIN'  : 1.0,
 	'COS'  : 1.0,
-	// 4 : 1.0,
-	// 5 : 1.0,
-	// 6 : 1.0,
-	// 7 : 1.0,
-	// 8 : 1.0,
-	// 9 : 1.0,
 };
 
-const UOParams = {
-	'DIV'  : [1, 1],
+const OParams = {
+	'DIV'  : null,
+	'EXP'  : null,
+
 	'POW'  : [2, 10],
 	'ROOT' : [2, 3],
-	'EXP'  : [2, 10],
+	'UDIV' : 1,
+	'UEXP' : [2, 10],
 	'SIN'  : null,
 	'COS'  : null,
 };
 
-// zero — expr, first — param
-const UOLatex = {
-	'DIV'  : '\\frac{ %1 }{ %0 }',
-	'POW'  : '%0 ^ {%1}',
-	'ROOT' : '\\sqrt[%1]{ %0 }',
-	'EXP'  : '%1 ^ {%0}',
-	'SIN'  : '\\sin ( %0 )',
-	'COS'  : '\\cos ( %0 )',
+const OArgsCount = {
+	'DIV'  : 2,
+	'EXP'  : 2,
+
+	'POW'  : 1,
+	'ROOT' : 1,
+	'UDIV' : 1,
+	'UEXP' : 1,
+	'SIN'  : 1,
+	'COS'  : 1,
+}
+
+const OLatex = {
+	'DIV'  : (o) => '\\frac { %0 }{ %1 }'.fmt(
+		o.mems[0].latex(), o.mems[1].latex()
+	),
+	'EXP'  : (o) => '%0 ^ { %1 }'.fmt(
+		o.mems[0].latex(), o.mems[1].latex()
+	),
+
+	'POW'  : (o) => '%0 ^ { %1 }'.fmt(
+		o.mems[0].latex(), o.param
+	),
+	'ROOT' : (o) => {
+		return (o.param == 2 ?
+			'\\sqrt{ %0 }' :
+			'\\sqrt[%1]{ %0 }'
+		).fmt( o.mems[0].latex(), o.param );
+	},
+	'UDIV' : (o) => '\\frac{ %1 }{ %0 }'.fmt(
+		o.mems[0].latex(), o.param
+	),
+	'UEXP' : (o) => '%1 ^ { %0 }'.fmt(
+		o.mems[0].latex(), o.param
+	),
+	'SIN'  : (o) => '\\sin ( %0 )'.fmt(
+		o.mems[0].latex(), o.param
+	),
+	'COS'  : (o) => '\\cos ( %0 )'.fmt(
+		o.mems[0].latex(), o.param
+	),
 };
+
+function istrig(op) // is trigonometry
+{
+	return op == OType.SIN || op == OType.COS;
+}
 
 
 /*
- * Функции передаётся три возможных
+ * Функции передаётся четыре возможных
  * набора значений:
  *
  * 1. null — в этом случае функция
  *    возвращает null
- * 2. Array — тогда функция возвращает
+ * 2. Number — функция возвращает это
+ *    число
+ * 3. Array — тогда функция возвращает
  *    случайное целое число от ar[0] до
  *    ar[1] включительно
- * 3. function, args... — вызывается
+ * 4. function, args... — вызывается
  *    функция, переданное первым аргу-
  *    ментом, с аргументами args...
  */
@@ -109,6 +148,9 @@ function extract_value(obj)
 {
 	if(!obj)
 		return null;
+
+	if(typeof obj == 'number')
+		return obj;
 
 	if(Array.isArray(obj))
 		return randint(obj[0], obj[1]);
@@ -129,6 +171,7 @@ function extract_value(obj)
  */
 function choice(wmap)
 {
+	console.log(wmap);
 	let sum = 0;
 	for(let el in wmap)
 	{
@@ -153,10 +196,11 @@ function choice(wmap)
 
 class Expression
 {
-	costructor()
-	{
-		
-	}
+	/*
+	 * par : Expression (abstruct)
+	 */
+
+	costructor() {}
 
 
 	/* transformation */
@@ -169,9 +213,11 @@ class Expression
 		throw 'Expression::latex() method is abstruct';
 	}
 
-	isvar()   { return false; }
-	ismult()  { return false; }
-	isunary() { return false; }
+
+
+	isvar() { return false; }
+	iscao() { return false; }
+	iso()   { return false; }
 
 };
 
@@ -182,13 +228,15 @@ class Expression
 class Variable extends Expression
 {
 	/*
-	 * name : String
+	 * name   : String
+	 * par    : Expression
 	 */
 
-	constructor(name)
+	constructor(name, par)
 	{
 		super();
 		this.name = name || 'x';
+		this.par  = par  || null;
 	}
 
 	latex()
@@ -203,22 +251,24 @@ class Variable extends Expression
 
 
 
-class MultipleOperation extends Expression
+class CAOperation extends Expression
 {
 	/*
-	 * op   : MultipleOperationType
-	 * mems : Array of Expression
+	 * op     : MultipleOperationType
+	 * mems   : Array of Expression
+	 * par    : Expression
 	 */
 
-	constructor(op, mems)
+	constructor(op, mems, par)
 	{
 		super();
 		this.op   = op   || null;
 		this.mems = mems || null;
+		this.par  = par  || null;
 		return;
 	}
 
-	ismult() { return true; }
+	iscao() { return true; }
 
 
 
@@ -232,9 +282,9 @@ class MultipleOperation extends Expression
 		if(this.mems.length < 2)
 			return this.mems[0].latex();
 
-		let res = MOLatex[this.op].fmt(this.mems[0].latex(), this.mems[1].latex());
+		let res = CAOLatex[this.op].fmt(this.mems[0].latex(), this.mems[1].latex());
 		for(let i = 2; i < this.mems.length; ++i) 
-			res = MOLatex[this.op].fmt(res, this.mems[i].latex());
+			res = CAOLatex[this.op].fmt(res, this.mems[i].latex());
 		return '\\left( ' + res + ' \\right)';
 	}
 };
@@ -243,24 +293,26 @@ class MultipleOperation extends Expression
 
 
 
-class UnaryOperation extends Expression
+class Operation extends Expression
 {
 	/*
-	 * op    : UnaryOperationType
-	 * expr  : Expression
-	 * param : Number
+	 * op     : UnaryOperationType
+	 * mems   : Array of exprs
+	 * param  : Number
+	 * par    : Expression
 	 */
 
-	constructor(op, expr, param)
+	constructor(op, mems, param, par)
 	{
 		super();
 		this.op    = op    || null;
-		this.expr  = expr  || null;
+		this.mems  = mems  || null;
 		this.param = param || null;
+		this.par   = par   || null;
 		return;
 	}
 
-	isunary() { return true; }
+	iso() { return true; }
 
 
 
@@ -271,6 +323,6 @@ class UnaryOperation extends Expression
 	 */
 	latex()
 	{
-		return UOLatex[this.op].fmt(this.expr.latex(), this.param);
+		return OLatex[this.op](this);
 	}
 }
