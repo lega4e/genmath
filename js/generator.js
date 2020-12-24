@@ -116,16 +116,14 @@ function choice_otype(map)
 	function calculate_strict(dpaf)
 	{
 		let dp = Math.abs(dpaf.depth)
-		let k = max( 0.0, 1.0 - dp/10.0 );
+		let k = max( 0.0, 1.0 - dpaf.affinity/10.0 );
 
 		switch(dp)
 		{
-			case 0: case 1:
+			case 0: case 1: case 2:
 				return 1.0 - k;
-			case 2:
-				return 1.0 - k*0.85;
 			case 3:
-				return 1.0 - k*0.7;
+				return 1.0 - k*0.8;
 			default:
 				return 1.0 - 4*k/dp/3;
 		}
@@ -134,7 +132,7 @@ function choice_otype(map)
 	function calculate_soft(dpaf)
 	{
 		let dp = Math.abs(dpaf.depth)
-		let k = max( 0.0, 1.0 - dp/10.0 );
+		let k = max( 0.0, 1.0 - dpaf.affinity/10.0 );
 
 		if(dp == 0 || dp == 1)
 			return 1.0 - k*0.85;
@@ -154,6 +152,7 @@ function choice_otype(map)
 			{
 				probs[OType.EXP]  *= mult;
 				probs[OType.UEXP] *= mult;
+				probs[OType.POW]  *= 1 - (1 - mult)/2;
 			}
 			else
 				probs[op] *= mult;
