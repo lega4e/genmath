@@ -12,33 +12,10 @@
 
 
 
-const CAOType = {
-	'ADD' : 'ADD',
-	'SUB' : 'SUB',
-	'MUL' : 'MUL',
-};
-
-const CAOTypeProbs = {
-	'ADD' : 1.0,
-	'SUB' : 1.0,
-	'MUL' : 1.0,
-};
-
-const CAOIntervals = {
-	'ADD' : [2, 3],
-	'SUB' : 2,
-	'MUL' : [2, 3],
-};
-
-const CAOLatex = {
-	'ADD' : '%0 + %1',
-	'SUB' : '%0 - %1',
-	'MUL' : '%0 %1',
-};
-
-
-
 const OType = {
+	'ADD' : 'ADD',
+	'MUL' : 'MUL',
+
 	'DIV'  : 'DIV',
 	'EXP'  : 'EXP',
 
@@ -57,18 +34,24 @@ const OType = {
 };
 
 const OTypeProbs = {
+	'ADD' : 0.7,
+	'MUL' : 0.7,
+
 	'DIV'  : 1.0,
-	'EXP'  : 0.5,
+	'EXP'  : 0.3,
 
 	'POW'  : 1.2,
 	'ROOT' : 1.2,
-	'UDIV' : 0.75,
-	'UEXP' : 0.2,
-	'SIN'  : 1.0,
-	'COS'  : 1.0,
+	'UDIV' : 0.5,
+	'UEXP' : 0.3,
+	'SIN'  : 0.8,
+	'COS'  : 0.8,
 };
 
 const OParams = {
+	'ADD'  : null,
+	'MUL'  : null,
+
 	'DIV'  : null,
 	'EXP'  : null,
 
@@ -81,6 +64,9 @@ const OParams = {
 };
 
 const OArgsCount = {
+	'ADD'  : 2,
+	'MUL'  : 2,
+
 	'DIV'  : 2,
 	'EXP'  : 2,
 
@@ -90,9 +76,16 @@ const OArgsCount = {
 	'UEXP' : 1,
 	'SIN'  : 1,
 	'COS'  : 1,
-}
+};
 
 const OLatex = {
+	'ADD'  : (o) => '%0 + %1'.fmt(
+		o.mems[0].latex(), o.mems[1].latex()
+	),
+	'MUL'  : (o) => '%0 %1'.fmt(
+		o.mems[0].latex(), o.mems[1].latex()
+	),
+
 	'DIV'  : (o) => '\\frac { %0 }{ %1 }'.fmt(
 		o.mems[0].latex(), o.mems[1].latex()
 	),
@@ -171,7 +164,6 @@ function extract_value(obj)
  */
 function choice(wmap)
 {
-	console.log(wmap);
 	let sum = 0;
 	for(let el in wmap)
 	{
@@ -251,48 +243,6 @@ class Variable extends Expression
 
 
 
-class CAOperation extends Expression
-{
-	/*
-	 * op     : MultipleOperationType
-	 * mems   : Array of Expression
-	 * par    : Expression
-	 */
-
-	constructor(op, mems, par)
-	{
-		super();
-		this.op   = op   || null;
-		this.mems = mems || null;
-		this.par  = par  || null;
-		return;
-	}
-
-	iscao() { return true; }
-
-
-
-	/* transformation */
-	/*
-	 * Возвращает представление выражения в
-	 * формате latex
-	 */
-	latex()
-	{
-		if(this.mems.length < 2)
-			return this.mems[0].latex();
-
-		let res = CAOLatex[this.op].fmt(this.mems[0].latex(), this.mems[1].latex());
-		for(let i = 2; i < this.mems.length; ++i) 
-			res = CAOLatex[this.op].fmt(res, this.mems[i].latex());
-		return '\\left( ' + res + ' \\right)';
-	}
-};
-
-
-
-
-
 class Operation extends Expression
 {
 	/*
@@ -323,6 +273,12 @@ class Operation extends Expression
 	 */
 	latex()
 	{
-		return OLatex[this.op](this);
+		return '\\left( ' + OLatex[this.op](this) + ' \\right)';
 	}
 }
+
+
+
+
+
+/* END */

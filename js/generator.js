@@ -102,12 +102,6 @@ function _clone_probs(probs)
 	return cp;
 }
 
-function choice_caotype(map)
-{
-	let op = choice(CAOTypeProbs);
-	return op;
-}
-
 function choice_otype(map)
 {
 	function isstrict(op)
@@ -195,56 +189,30 @@ function choice_otype(map)
 
 function generate_expression(depth, parexpr)
 {
-	return Math.random() < 0.75 ?
-		generate_o(depth, parexpr) :
-		generate_cao(depth, parexpr);
-}
-
-function generate_cao(depth, parexpr)
-{
-	if(depth <= 1)
-		return create_variable();
-
-	let map = calculate_map(parexpr);
-	console.log("parexpr:", parexpr);
-	console.log("(cao)map:", map);
-	let expr = new CAOperation;
-	expr.op = choice_caotype(map)
-	expr.par = parexpr || null;
-
-	let len = extract_value(CAOIntervals[expr.op]);
-	let dp = [];
-	for(let i = 0; i < len; ++i)
-		dp.push( Math.random() > 0.5 ? depth-1-i : depth-2-i);
-	shuffle(dp);
-
-	expr.mems = [];
-	for(let i = 0; i < len; ++i)
-		expr.mems.push(generate_expression(dp[i], expr));
-
-	return expr;
-}
-
-function generate_o(depth, parexpr)
-{
 	if(depth <= 0)
 		return create_variable();
 
 	let map = calculate_map(parexpr);
-	console.log("parexpr:", parexpr);
-	console.log("(o)map:", map);
 	let expr = new Operation;
-	expr.op = choice_otype(map);
+
+	do
+	{
+		expr.op = choice_otype(map);
+	}
+	while(depth - OArgsCount[expr.op] < 0)
 	expr.par = parexpr || null;
 
 	let argc = OArgsCount[expr.op];
 	expr.mems = [];
+
+	let dp = [];
+	for(let i = 0; i < argc; ++i)
+		dp.push(depth-1-i);
+	shuffle(dp);
+
 	for(let i = 0; i < argc; ++i) 
 	{
-		expr.mems.push( generate_expression(
-			Math.random() > 0.5 ? depth - 1 : depth - 2,
-			expr
-		) );
+		expr.mems.push( generate_expression( dp[i], expr) );
 	}
 
 	expr.param = extract_value(OParams[expr.op]);

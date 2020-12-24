@@ -22,10 +22,10 @@ window.generate = function()
 		let depth = parseInt($('#depth-input').val());
 
 		let expr = generate_expression(depth);
-		console.log('\nmain');
-		console.log(expr);
+		// console.log('\nmain');
+		// console.log(expr);
 		let latex = expr.latex();
-		console.log(latex);
+		// console.log(latex);
 		
 		exprs.push('<div> $$' + latex + '$$ </div>');
 	}
