@@ -33,9 +33,24 @@ const OType = {
 	// 'ACTG' : 9,
 };
 
+const OPriors = {
+	'ADD'  : 0,
+	'MUL'  : 1,
+
+	'DIV'  : 1,
+	'EXP'  : 2,
+
+	'POW'  : 2,
+	'ROOT' : -1,
+	'UDIV' : 1,
+	'UEXP' : 2,
+	'SIN'  : -1,
+	'COS'  : -1,
+};
+
 const OTypeProbs = {
-	'ADD' : 0.7,
-	'MUL' : 0.7,
+	'ADD'  : 0.7,
+	'MUL'  : 0.7,
 
 	'DIV'  : 1.0,
 	'EXP'  : 0.3,
@@ -79,42 +94,113 @@ const OArgsCount = {
 };
 
 const OLatex = {
-	'ADD'  : (o) => '%0 + %1'.fmt(
-		o.mems[0].latex(), o.mems[1].latex()
-	),
-	'MUL'  : (o) => '%0 %1'.fmt(
-		o.mems[0].latex(), o.mems[1].latex()
-	),
 
-	'DIV'  : (o) => '\\frac { %0 }{ %1 }'.fmt(
-		o.mems[0].latex(), o.mems[1].latex()
-	),
-	'EXP'  : (o) => '%0 ^ { %1 }'.fmt(
-		o.mems[0].latex(), o.mems[1].latex()
-	),
+	'ADD'  : (o) =>
+	{
+		let s = '%0 + %1'.fmt(
+			o.mems[0].latex(), o.mems[1].latex()
+		);
+		if(o.par && OPriors[o.par.op] > OPriors[o.op])
+			return isolate(s);
+		return s;
+	},
 
-	'POW'  : (o) => '%0 ^ { %1 }'.fmt(
-		o.mems[0].latex(), o.param
-	),
-	'ROOT' : (o) => {
-		return (o.param == 2 ?
+	'MUL'  : (o) =>
+	{
+		let s = '%0 %1'.fmt(
+			o.mems[0].latex(), o.mems[1].latex()
+		);
+		if(o.par && OPriors[o.par.op] > OPriors[o.op])
+			return isolate(s);
+		return s;
+	},
+
+
+	'DIV'  : (o) =>
+	{
+		let s = '\\frac { %0 }{ %1 }'.fmt(
+			o.mems[0].latex(), o.mems[1].latex()
+		);
+		if(o.par && OPriors[o.par.op] > OPriors[o.op])
+			return isolate(s);
+		return s;
+	},
+
+	'EXP'  : (o) =>
+	{
+		return '%0 ^ { %1 }'.fmt(
+			o.mems[0].latex(), o.mems[1].latex()
+		);
+	},
+
+
+	'POW'  : (o) =>
+	{
+		return '%0 ^ { %1 }'.fmt(
+			o.mems[0].latex(), o.param
+		);
+	},
+
+	'ROOT' : (o) =>
+	{
+		let s = (o.param == 2 ?
 			'\\sqrt{ %0 }' :
 			'\\sqrt[%1]{ %0 }'
 		).fmt( o.mems[0].latex(), o.param );
+		if(o.par && (
+			o.par.op == 'POW' ||
+			o.par.op == 'EXP' && o === o.par.mems[0]
+		) )
+			return isolate(s);
+		return s;
 	},
-	'UDIV' : (o) => '\\frac{ %1 }{ %0 }'.fmt(
-		o.mems[0].latex(), o.param
-	),
-	'UEXP' : (o) => '%1 ^ { %0 }'.fmt(
-		o.mems[0].latex(), o.param
-	),
-	'SIN'  : (o) => '\\sin ( %0 )'.fmt(
-		o.mems[0].latex(), o.param
-	),
-	'COS'  : (o) => '\\cos ( %0 )'.fmt(
-		o.mems[0].latex(), o.param
-	),
+
+	'UDIV' : (o) =>
+	{
+		let s = '\\frac { %0 }{ %1 }'.fmt(
+			o.param, o.mems[0].latex()
+		);
+		if(o.par && OPriors[o.par.op] > OPriors[o.op])
+		{
+			if(
+				e.par.op == OType.UEXP ||
+				o.par.op == OType.EXP && o === o.par.mems[1]
+			)
+				return s;
+			return isolate(s);
+		}
+		return s;
+	},
+
+	'UEXP' : (o) =>
+	{
+		return '%1 ^ { %0 }'.fmt(
+			o.mems[0].latex(), o.param
+		);
+	},
+
+	'SIN'  : (o) =>
+	{
+		let s = o.mems[0].latex();
+		if(o.mems[0].depth() > 1)
+			return '\\sin ' + isolate(s);
+		return '\\sin ' + s;
+	},
+
+	'COS'  : (o) =>
+	{
+		let s = o.mems[0].latex();
+		if(o.mems[0].depth() > 1)
+			return '\\cos ' + isolate(s);
+		return '\\cos ' + s;
+	},
+
 };
+
+function isolate(s)
+{
+	return '\\left( ' + s + '\\right)';
+}
 
 function istrig(op) // is trigonometry
 {
@@ -205,6 +291,11 @@ class Expression
 		throw 'Expression::latex() method is abstruct';
 	}
 
+	depth()
+	{
+		throw 'Expression::depth() method is abstruct';
+	}
+
 
 
 	isvar() { return false; }
@@ -236,6 +327,11 @@ class Variable extends Expression
 		return ' ' + this.name + ' ';
 	}
 
+	depth()
+	{
+		return 0;
+	}
+
 	isvar() { return true; }
 };
 
@@ -262,6 +358,14 @@ class Operation extends Expression
 		return;
 	}
 
+	depth()
+	{
+		let m = 0;
+		for(let i = 0; i < this.mems.length; ++i)
+			m = max(m, this.mems[i].depth());
+		return m+1;
+	}
+
 	iso() { return true; }
 
 
@@ -273,7 +377,7 @@ class Operation extends Expression
 	 */
 	latex()
 	{
-		return '\\left( ' + OLatex[this.op](this) + ' \\right)';
+		return OLatex[this.op](this);
 	}
 }
 
