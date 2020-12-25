@@ -50,7 +50,7 @@ const OPriors = {
 
 const OTypeProbs = {
 	'ADD'  : 0.7,
-	'MUL'  : 0.7,
+	'MUL'  : 2.5,
 
 	'DIV'  : 1.0,
 	'EXP'  : 0.3,
