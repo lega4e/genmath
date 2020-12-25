@@ -17,16 +17,14 @@ window.keypress = function()
 window.generate = function()
 {
 	let exprs = [];
-	for(let i = 0; i < 10; ++i) 
-	{
-		let depth = parseInt($('#depth-input').val());
+	let depth = parseInt($('#depth-input').val());
+	if(isNaN(depth))
+		return;
 
+	for(let i = 0; i < 20; ++i) 
+	{
 		let expr = generate_expression(depth);
-		// console.log('\nmain');
-		// console.log(expr);
 		let latex = expr.latex();
-		// console.log(latex);
-		
 		exprs.push('<div> $$' + latex + '$$ </div>');
 	}
 
