@@ -210,9 +210,7 @@ function generate_expression(depth, parexpr)
 	shuffle(dp);
 
 	for(let i = 0; i < argc; ++i) 
-	{
-		expr.mems.push( generate_expression( dp[i], expr) );
-	}
+		expr.mems.push( generate_expression(dp[i], expr) );
 
 	expr.param = extract_value(OParams[expr.op]);
 

@@ -93,6 +93,31 @@ const OArgsCount = {
 	'COS'  : 1,
 };
 
+
+
+function _priorless(o)
+{
+	if(o.par && OPriors[o.op] < OPriors[o.par.op])
+		return true;
+	return false;
+}
+
+function _ispower(o)
+{
+	return o.par && (
+		o.par.op == OType.UEXP ||
+		o.par.op == OType.EXP && o == o.par.mems[1]
+	);
+}
+
+function _isbase(o)
+{
+	return o.par && (
+		o.par.op == OType.POW ||
+		o.par.op == OType.EXP && o == o.par.mems[0]
+	);
+}
+
 const OLatex = {
 
 	'ADD'  : (o) =>
@@ -100,9 +125,7 @@ const OLatex = {
 		let s = '%0 + %1'.fmt(
 			o.mems[0].latex(), o.mems[1].latex()
 		);
-		if(o.par && OPriors[o.par.op] > OPriors[o.op])
-			return isolate(s);
-		return s;
+		return _priorless(o) && !_ispower(o) ? isolate(s) : s;
 	},
 
 	'MUL'  : (o) =>
@@ -110,9 +133,7 @@ const OLatex = {
 		let s = '%0 %1'.fmt(
 			o.mems[0].latex(), o.mems[1].latex()
 		);
-		if(o.par && OPriors[o.par.op] > OPriors[o.op])
-			return isolate(s);
-		return s;
+		return _priorless(o) && !_ispower(o) ? isolate(s) : s;
 	},
 
 
@@ -121,24 +142,24 @@ const OLatex = {
 		let s = '\\frac { %0 }{ %1 }'.fmt(
 			o.mems[0].latex(), o.mems[1].latex()
 		);
-		if(o.par && OPriors[o.par.op] > OPriors[o.op])
-			return isolate(s);
-		return s;
+		return _priorless(o) && !_ispower(o) ? isolate(s) : s;
 	},
 
 	'EXP'  : (o) =>
 	{
-		return '%0 ^ { %1 }'.fmt(
+		let s = '%0 ^ { %1 }'.fmt(
 			o.mems[0].latex(), o.mems[1].latex()
 		);
+		return _isbase(o) ? isolate(s) : s;
 	},
 
 
 	'POW'  : (o) =>
 	{
-		return '%0 ^ { %1 }'.fmt(
+		let s = '%0 ^ { %1 }'.fmt(
 			o.mems[0].latex(), o.param
 		);
+		return _isbase(o) ? isolate(s) : s;
 	},
 
 	'ROOT' : (o) =>
@@ -147,12 +168,7 @@ const OLatex = {
 			'\\sqrt{ %0 }' :
 			'\\sqrt[%1]{ %0 }'
 		).fmt( o.mems[0].latex(), o.param );
-		if(o.par && (
-			o.par.op == 'POW' ||
-			o.par.op == 'EXP' && o === o.par.mems[0]
-		) )
-			return isolate(s);
-		return s;
+		return _isbase(o) ? isolate(s) : s;
 	},
 
 	'UDIV' : (o) =>
@@ -160,23 +176,15 @@ const OLatex = {
 		let s = '\\frac { %0 }{ %1 }'.fmt(
 			o.param, o.mems[0].latex()
 		);
-		if(o.par && OPriors[o.par.op] > OPriors[o.op])
-		{
-			if(
-				e.par.op == OType.UEXP ||
-				o.par.op == OType.EXP && o === o.par.mems[1]
-			)
-				return s;
-			return isolate(s);
-		}
-		return s;
+		return _priorless(o) && !_ispower(o) ?  isolate(s) : s;
 	},
 
 	'UEXP' : (o) =>
 	{
-		return '%1 ^ { %0 }'.fmt(
+		let s = '%1 ^ { %0 }'.fmt(
 			o.mems[0].latex(), o.param
 		);
+		return _isbase(o) ? isolate(s) : s;
 	},
 
 	'SIN'  : (o) =>
@@ -184,7 +192,7 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\sin ' + isolate(s);
-		return '\\sin ' + s;
+		return _isbase(o) ? isolate('\\sin ' + s) : '\\sin ' + s;
 	},
 
 	'COS'  : (o) =>
@@ -192,7 +200,7 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\cos ' + isolate(s);
-		return '\\cos ' + s;
+		return _isbase(o) ? isolate('\\cos ' + s) : '\\cos ' + s;
 	},
 
 };
