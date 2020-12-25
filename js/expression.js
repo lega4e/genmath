@@ -23,14 +23,16 @@ const OType = {
 	'ROOT' : 'ROOT',
 	'UDIV' : 'UDIV',
 	'UEXP' : 'UEXP',
+
 	'SIN'  : 'SIN',
 	'COS'  : 'COS',
-	// 'TAN'  : 4,
-	// 'CTG'  : 5,
-	// 'ASIN' : 6,
-	// 'ACOS' : 7,
-	// 'ATAN' : 8,
-	// 'ACTG' : 9,
+	'TAN'  : 'TAN',
+	'CTG'  : 'CTG',
+	'ASIN' : 'ASIN',
+	'ACOS' : 'ACOS',
+	'ATAN' : 'ATAN',
+
+	'LOG'  : 'LOG',
 };
 
 const OPriors = {
@@ -44,23 +46,40 @@ const OPriors = {
 	'ROOT' : -1,
 	'UDIV' : 1,
 	'UEXP' : 2,
+
 	'SIN'  : -1,
 	'COS'  : -1,
+	'TAN'  : -1,
+	'CTG'  : -1,
+	'ASIN' : -1,
+	'ACOS' : -1,
+	'ATAN' : -1,
+
+	'LOG'  : -1,
 };
 
 const OTypeProbs = {
 	'ADD'  : 0.7,
-	'MUL'  : 2.5,
+	'MUL'  : 2.0,
 
 	'DIV'  : 1.0,
-	'EXP'  : 0.3,
+	'EXP'  : 0.2,
 
 	'POW'  : 1.2,
 	'ROOT' : 1.2,
 	'UDIV' : 0.5,
-	'UEXP' : 0.3,
-	'SIN'  : 0.8,
-	'COS'  : 0.8,
+	'UEXP' : 0.2,
+
+	'SIN'  : 0.4,
+	'COS'  : 0.4,
+
+	'TAN'  : 0.3,
+	'CTG'  : 0.3,
+	'ASIN' : 0.1,
+	'ACOS' : 0.1,
+	'ATAN' : 0.1,
+
+	'LOG'  : 0.5,
 };
 
 const OParams = {
@@ -74,8 +93,21 @@ const OParams = {
 	'ROOT' : [2, 3],
 	'UDIV' : 1,
 	'UEXP' : [2, 10],
+
 	'SIN'  : null,
 	'COS'  : null,
+
+	'TAN'  : null,
+	'CTG'  : null,
+	'ASIN' : null,
+	'ACOS' : null,
+	'ATAN' : null,
+
+	'LOG'  : () => {
+		return Math.random() < 0.7 ?
+			Math.E : Math.random() < 0.5 ?
+			2 : [3, 4, 5, 6, 7, 8, 9][randint(0, 6)];
+	}
 };
 
 const OArgsCount = {
@@ -89,8 +121,17 @@ const OArgsCount = {
 	'ROOT' : 1,
 	'UDIV' : 1,
 	'UEXP' : 1,
+
 	'SIN'  : 1,
 	'COS'  : 1,
+
+	'TAN'  : 1,
+	'CTG'  : 1,
+	'ASIN' : 1,
+	'ACOS' : 1,
+	'ATAN' : 1,
+
+	'LOG'  : 1,
 };
 
 
@@ -187,6 +228,7 @@ const OLatex = {
 		return _isbase(o) ? isolate(s) : s;
 	},
 
+
 	'SIN'  : (o) =>
 	{
 		let s = o.mems[0].latex();
@@ -203,6 +245,57 @@ const OLatex = {
 		return _isbase(o) ? isolate('\\cos ' + s) : '\\cos ' + s;
 	},
 
+
+	'TAN'  : (o) =>
+	{
+		let s = o.mems[0].latex();
+		if(o.mems[0].depth() > 1)
+			return '\\tan ' + isolate(s);
+		return _isbase(o) ? isolate('\\tan ' + s) : '\\tan ' + s;
+	},
+
+	'CTG'  : (o) =>
+	{
+		let s = o.mems[0].latex();
+		if(o.mems[0].depth() > 1)
+			return '\\cot ' + isolate(s);
+		return _isbase(o) ? isolate('\\cot ' + s) : '\\cot ' + s;
+	},
+
+	'ASIN' : (o) =>
+	{
+		let s = o.mems[0].latex();
+		if(o.mems[0].depth() > 1)
+			return '\\arcsin ' + isolate(s);
+		return _isbase(o) ? isolate('\\arcsin ' + s) : '\\arcsin ' + s;
+	},
+
+	'ACOS' : (o) =>
+	{
+		let s = o.mems[0].latex();
+		if(o.mems[0].depth() > 1)
+			return '\\arccos ' + isolate(s);
+		return _isbase(o) ? isolate('\\arccos ' + s) : '\\arccos ' + s;
+	},
+
+	'ATAN' : (o) =>
+	{
+		let s = o.mems[0].latex();
+		if(o.mems[0].depth() > 1)
+			return '\\arctan ' + isolate(s);
+		return _isbase(o) ? isolate('\\arctan ' + s) : '\\arctan ' + s;
+	},
+
+
+	'LOG'  : (o) =>
+	{
+		let s = o.mems[0].latex();
+		let f = o.param == Math.E ? '\\ln' : '\\log_{ %0 }'.fmt(o.param);
+		if(o.mems[0].depth() > 1)
+			return f + ' ' + isolate(s);
+		return _isbase(o) ? isolate(f + ' ' + s) : f + ' ' + s;
+	},
+
 };
 
 function isolate(s)
@@ -212,7 +305,10 @@ function isolate(s)
 
 function istrig(op) // is trigonometry
 {
-	return op == OType.SIN || op == OType.COS;
+	return op == OType.SIN  || op == OType.COS  ||
+		   op == OType.TAN  || op == OType.CTG  ||
+		   op == OType.ASIN || op == OType.ACOS ||
+		   op == OType.ATAN;
 }
 
 

@@ -166,64 +166,55 @@ function choice_otype(map, depth)
 	for(let op in map)
 	for(let i = 0; i < map[op].length; ++i)
 	{
-		if(isstrict(op))
-		{
-			mult = calculate_strict(map[op][i]);
-			if(op == OType.EXP || op == OType.UEXP)
-			{
-				probs[OType.EXP]  *= mult;
-				probs[OType.UEXP] *= mult;
-				probs[OType.POW]  *= 1 - 2*(1 - mult)/3;
-			}
-			else if(op == OType.UDIV)
-			{
-				probs[OType.UDIV] *= mult;
-				probs[OType.DIV]  *= mult;
-			}
-			else
-			{
-				probs[op] *= mult;
-			}
-		}
-		else
-		{
-			mult = op == OType.ADD || op == OType.MUL ?
+		mult = isstrict(op) ?
+			calculate_strict(map[op][i]) :
+			op == OType.ADD || op == OType.MUL ?
 				calculate_very_soft(map[op][i]) :
 				calculate_soft(map[op][i]);
 
-			if(istrig(op))
+		if(istrig(op))
+		{
+			for(let pr in probs)
 			{
-				for(let pr in probs)
+				if(istrig(pr))
 				{
-					if(istrig(pr))
-					{
-						if(pr == op)
-							probs[pr] *= mult;
-						else
-							probs[pr] *= 1 - (1 - mult)/2; // TODO: set to trig count
-					}
+					if(pr == op)
+						probs[pr] *= mult;
+					else
+						probs[pr] *= 1 - (1 - mult)/2; // TODO: set to trig count
 				}
 			}
-			if(op == OType.DIV)
-			{
-				probs[OType.DIV]  *= mult;
-				probs[OType.UDIV] *= calculate_strict(map[op][i]);
-			}
-			else if(op == 'VAR')
-			{
-				if(depth == 1)
-				{
-					probs[OType.ADD]  = 0;
-					probs[OType.MUL]  = 0;
-					probs[OType.DIV]  = 0;
-					probs[OType.UDIV] = 0;
-					probs[OType.POW]  = 0;
-					probs[OType.EXP]  = 0;
-				}
-			}
-			else
-				probs[op] *= mult;
 		}
+		else if(op == OType.EXP || op == OType.UEXP)
+		{
+			probs[OType.EXP]  *= mult;
+			probs[OType.UEXP] *= mult;
+			probs[OType.POW]  *= 1 - 2*(1 - mult)/3;
+		}
+		else if(op == OType.UDIV)
+		{
+			probs[OType.UDIV] *= mult;
+			probs[OType.DIV]  *= mult;
+		}
+		if(op == OType.DIV)
+		{
+			probs[OType.DIV]  *= mult;
+			probs[OType.UDIV] *= calculate_strict(map[op][i]);
+		}
+		else if(op == 'VAR')
+		{
+			if(depth == 1)
+			{
+				probs[OType.ADD]  = 0;
+				probs[OType.MUL]  = 0;
+				probs[OType.DIV]  = 0;
+				probs[OType.UDIV] = 0;
+				probs[OType.POW]  = 0;
+				probs[OType.EXP]  = 0;
+			}
+		}
+		else
+			probs[op] *= mult;
 	}
 
 	let res = choice(probs);
