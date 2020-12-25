@@ -70,16 +70,16 @@ const OTypeProbs = {
 	'UDIV' : 0.5,
 	'UEXP' : 0.2,
 
-	'SIN'  : 0.4,
-	'COS'  : 0.4,
+	'SIN'  : 0.3,
+	'COS'  : 0.3,
 
-	'TAN'  : 0.3,
-	'CTG'  : 0.3,
-	'ASIN' : 0.1,
-	'ACOS' : 0.1,
-	'ATAN' : 0.1,
+	'TAN'  : 0.1,
+	'CTG'  : 0.1,
+	'ASIN' : 0.03,
+	'ACOS' : 0.03,
+	'ATAN' : 0.03,
 
-	'LOG'  : 0.5,
+	'LOG'  : 0.4,
 };
 
 const OParams = {
