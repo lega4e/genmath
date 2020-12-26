@@ -39,7 +39,7 @@ const OPriors = {
 	'ADD'  : 0,
 	'MUL'  : 1,
 
-	'DIV'  : 1,
+	'DIV'  : -1,
 	'EXP'  : 2,
 
 	'POW'  : 2,
@@ -403,7 +403,6 @@ class Expression
 
 
 	isvar() { return false; }
-	iscao() { return false; }
 	iso()   { return false; }
 
 };

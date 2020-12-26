@@ -21,13 +21,14 @@ window.generate = function()
 	if(isNaN(depth))
 		return;
 
-	for(let i = 0; i < 20; ++i) 
+	for(let i = 0; i < 210; ++i) 
 	{
 		let expr = generate_expression(depth);
 		let latex = expr.latex();
+		if(i == 0)
+			console.log(latex);
 		exprs.push('<div> $$' + latex + '$$ </div>');
 	}
-
 
 	$('#formula').html(exprs.join(''));
 	MathJax.typeset();
