@@ -112,15 +112,15 @@ function _clone_probs(probs)
 	return cp;
 }
 
-function choice_otype(map, depth)
+function calculate_probs(map, parexpr, depth)
 {
 	function isstrict(op)
 	{
 		return (
 			op == OType.ADD  || op == OType.MUL  ||
 			op == OType.POW  || op == OType.ROOT ||
-			op == OType.UDIV || op == OType.UEXP ||
-			op == OType.EXP
+			op == OType.DIV  || op == OType.UDIV ||
+			op == OType.UEXP || op == OType.EXP
 		);
 	}
 
@@ -131,8 +131,10 @@ function choice_otype(map, depth)
 
 		switch(dp)
 		{
-			case 0: case 1: case 2:
+			case 0: case 1:
 				return 1.0 - k;
+			case 2:
+				return 1.0 - k*0.9;
 			case 3:
 				return 1.0 - k*0.8;
 			default:
@@ -145,66 +147,82 @@ function choice_otype(map, depth)
 		let dp = Math.abs(dpaf.depth)
 		let k = max( 0.0, 1.0 - dpaf.affinity/10.0 );
 
-		if(dp == 0 || dp == 1)
-			return 1.0 - k*0.85;
-		else
-			return 1.0 - 3*k/dp/2;
-	}
-
-	function calculate_very_soft(dpaf)
-	{
-		let dp = Math.abs(dpaf.depth);
-		let k = max( 0.0, 1.0 - dpaf.affinity/5.0 );
-
-		if(dp == 0 || dp == 1)
-			return 1.0 - k*0.7;
-		else
-			return 1.0 - k/dp;
+		if(dp == 0)
+			return 1.0 - k;
+		if(dp == 1)
+			return 1.0 - k*0.95;
+		return 1.0 - 5*k/(dp*3);
 	}
 
 	let probs = _clone_probs(OTypeProbs);
-	let mult;
+	let mult, selfmult;
 	for(let op in map)
 	for(let i = 0; i < map[op].length; ++i)
 	{
 		mult = isstrict(op) ?
 			calculate_strict(map[op][i]) :
-			op == OType.ADD || op == OType.MUL ?
-				calculate_very_soft(map[op][i]) :
-				calculate_soft(map[op][i]);
+			calculate_soft(map[op][i]);
 
-		if(istrig(op))
+		if(
+			map[op][i].affinity == 1 &&
+			map[op][i].depth == 0 && parexpr &&
+			( parexpr.op == OType.MUL ||
+			  parexpr.op == OType.ADD ||
+			  parexpr.op == OType.DIV )
+		)
+			selfmult = 0;
+		else
+			selfmult = mult;
+				
+
+
+		if(isfun(op))
 		{
 			for(let pr in probs)
 			{
-				if(istrig(pr))
+				if(isfun(pr))
 				{
 					if(pr == op)
-						probs[pr] *= mult;
+						probs[pr] *= selfmult;
 					else
-						probs[pr] *= 1 - (1 - mult)/2; // TODO: set to trig count
+						probs[pr] *= mult + (1 - mult)*2/3;
 				}
 			}
+
+			if(op == OType.SIN)
+				probs[OType.ASIN] *= mult;
+			else if(op == OType.COS)
+				probs[OType.ACOS] *= mult;
+			else if(op == OType.TAN)
+				probs[OType.ATAN] *= mult;
+
+			if(op[0] == 'A')
+			{
+				probs[OType.ASIN] *= mult;
+				probs[OType.ACOS] *= mult;
+				probs[OType.ATAN] *= mult;
+			}
 		}
-		else if(op == OType.EXP || op == OType.UEXP)
+		else if(op == OType.MUL)
 		{
-			probs[OType.EXP]  *= mult;
-			probs[OType.UEXP] *= mult;
-			probs[OType.POW]  *= 1 - 2*(1 - mult)/3;
-		}
-		else if(op == OType.UDIV)
-		{
+			probs[OType.MUL]  *= selfmult;
 			probs[OType.UDIV] *= mult;
 			probs[OType.DIV]  *= mult;
 		}
-		if(op == OType.DIV)
+		else if(op == OType.EXP || op == OType.UEXP)
 		{
-			probs[OType.DIV]  *= mult;
-			probs[OType.UDIV] *= calculate_strict(map[op][i]);
+			probs[OType.EXP]  *= op == OType.EXP  ? selfmult : mult;
+			probs[OType.UEXP] *= op == OType.UEXP ? selfmult : mult;
+			probs[OType.POW]  *= mult;
+		}
+		else if(op == OType.DIV || op == OType.UDIV)
+		{
+			probs[OType.DIV]  *= op == OType.DIV  ? selfmult : mult;
+			probs[OType.UDIV] *= op == OType.UDIV ? selfmult : mult;
 		}
 		else if(op == 'VAR')
 		{
-			if(depth == 1)
+			if(map[op][i].affinity == 1 && depth <= 2)
 			{
 				probs[OType.ADD]  = 0;
 				probs[OType.MUL]  = 0;
@@ -218,8 +236,7 @@ function choice_otype(map, depth)
 			probs[op] *= mult;
 	}
 
-	let res = choice(probs);
-	return res;
+	return probs;
 }
 
 
@@ -233,36 +250,69 @@ function generate_expression(depth, parexpr)
 
 	let map = calculate_map(parexpr);
 	let expr = new Operation;
+	let probs = calculate_probs(map, parexpr, depth);
 
 	let argc;
 	do
 	{
-		expr.op = choice_otype(map, depth);
+		expr.op = choice(probs);
 		argc = extract_value(OArgsCount[expr.op]);
 	}
 	while(depth - argc < 0);
 	expr.par = parexpr || null;
-	expr.mems = [];
 
-	let dp = [];
-	for(let i = 0; i < argc; ++i)
-		dp.push(depth-(argc-i));
-	if(expr.op != OType.ADD && expr.op != OType.MUL && expr.op != OType.DIV)
-		shuffle(dp);
+	expr.param = extract_value(OParams[expr.op]);
+	let grand = false;
+	if(
+		parexpr &&
+		(
+			(
+				parexpr.op == OType.ROOT && expr.op == OType.POW ||
+				parexpr.op == OType.POW  && expr.op == OType.ROOT
+			) ||
+			( 
+				(grand = true) &&
+				( parexpr.op == OType.ADD  ||
+				  parexpr.op == OType.MUL  ||
+				  parexpr.op == OType.DIV  ||
+				  parexpr.op == OType.UDIV ) &&
+				parexpr.par &&
+				( parexpr.par.op == OType.ROOT && expr.op == OType.POW ||
+				  parexpr.par.op == OType.POW  && expr.op == OType.ROOT )
+			)
+		)
+	)
+	{
+		let c = 0;
+		while( gcd(grand ? parexpr.par.param : parexpr.param, expr.param) != 1 )
+		{
+			expr.param = extract_value(OParams[expr.op]);
+			if(++c == 64)
+				throw 'c == 64 while generating param';
+		}
+	}
+
+	expr.mems = [];
+	if(argc == 0)
+		return expr;
+
+	let dp = [ depth - 1 ];
+	for(let i = 1; i < argc; ++i)
+	{
+		let c = Math.random();
+		dp.push( depth - 1 + ( c < 0.2 ? 0 : c < 0.9 ? -1 : -2 ) );
+	}
+
+	if(expr.op == OType.ADD || expr.op == OType.MUL || expr.op == OType.DIV)
+		dp.sort();
 
 	for(let i = 0; i < argc; ++i) 
 		expr.mems.push( generate_expression(dp[i], expr) );
 
 	if(expr.op == OType.MUL || expr.op == OType.ADD)
 		expr.mems.sort(expression_cmp);
-	else if(expr.op == OType.DIV && Math.random() > 0.5)
-	{
-		let tmp = expr.mems[0];
-		expr.mems[0] = expr.mems[1];
-		expr.mems[1] = tmp;
-	}
-
-	expr.param = extract_value(OParams[expr.op]);
+	else
+		shuffle(expr.mems);
 
 	return expr;
 }

@@ -153,10 +153,10 @@ const OOrder = {
 	'ATAN' : 10,
 	'LOG'  : 11,
 
-	'ROOT' : 12,
-	'UDIV' : 13,
-	'DIV'  : 14,
-	'ADD'  : 15,
+	'ADD'  : 12,
+	'ROOT' : 13,
+	'UDIV' : 14,
+	'DIV'  : 15,
 };
 
 
@@ -188,18 +188,34 @@ const OLatex = {
 
 	'ADD'  : (o) =>
 	{
-		let s = '%0 + %1'.fmt(
-			o.mems[0].latex(), o.mems[1].latex()
-		);
-		return _priorless(o) && !_ispower(o) ? isolate(s) : s;
+		let s = '%0 + %1'.fmt( o.mems[0].latex(), o.mems[1].latex() );
+		return s;
 	},
 
 	'MUL'  : (o) =>
 	{
 		let s = o.mems[0].latex();
+		if(o.mems[0].op == OType.ADD)
+			s = isolate(s);
+
+		let sep;
 		for(let i = 1; i < o.mems.length; ++i)
-			s += ' ' + o.mems[i].latex();
-		return _priorless(o) && !_ispower(o) ? isolate(s) : s;
+		{
+			if(
+				isfun(o.mems[i-1].op) || o.mems[i-1].op == OType.ROOT ||
+				(o.mems[i-1].op == OType.POW && isfun(o.mems[i-1].mems[0].op))
+			)
+				sep = ' \\cdot '
+			else
+				sep = ' ';
+
+			if(o.mems[i].op == OType.ADD)
+				s += sep + isolate(o.mems[i].latex());
+			else
+				s += sep + o.mems[i].latex();
+		}
+
+		return s;
 	},
 
 
@@ -208,49 +224,59 @@ const OLatex = {
 		let s = '\\frac { %0 }{ %1 }'.fmt(
 			o.mems[0].latex(), o.mems[1].latex()
 		);
-		return _priorless(o) && !_ispower(o) ? isolate(s) : s;
+		return s;
 	},
 
 	'EXP'  : (o) =>
 	{
 		let s = '%0 ^ { %1 }'.fmt(
-			o.mems[0].latex(), o.mems[1].latex()
+			o.mems[0].isvar() ?
+				o.mems[0].latex() :
+				isolate(o.mems[0].latex()),
+			o.mems[1].latex()
 		);
-		return _isbase(o) ? isolate(s) : s;
+		return s;
 	},
 
 
 	'POW'  : (o) =>
 	{
-		let s = '%0 ^ { %1 }'.fmt(
-			o.mems[0].latex(), o.param
-		);
-		return _isbase(o) ? isolate(s) : s;
+		if(isfun(o.mems[0].op))
+		{
+			let s = o.mems[0].latex();
+			let pos = s.indexOf(' ');
+			if(pos < 0)
+				throw 'pos of space less then 0';
+			s = s.slice(0, pos) + ' ^{%0} '.fmt(o.param) + s.slice(pos+1);
+			return s;
+		}
+
+		if(o.mems[0].isvar())
+			return o.mems[0].latex() + ' ^{ %0 } '.fmt(o.param);
+
+		return '%0 ^ { %1 }'.fmt( isolate(o.mems[0].latex()), o.param );
 	},
 
 	'ROOT' : (o) =>
 	{
-		let s = (o.param == 2 ?
+		return (o.param == 2 ?
 			'\\sqrt{ %0 }' :
 			'\\sqrt[%1]{ %0 }'
 		).fmt( o.mems[0].latex(), o.param );
-		return _isbase(o) ? isolate(s) : s;
 	},
 
 	'UDIV' : (o) =>
 	{
-		let s = '\\frac { %0 }{ %1 }'.fmt(
+		return '\\frac { %0 }{ %1 }'.fmt(
 			o.param, o.mems[0].latex()
 		);
-		return _priorless(o) && !_ispower(o) ?  isolate(s) : s;
 	},
 
 	'UEXP' : (o) =>
 	{
-		let s = '%1 ^ { %0 }'.fmt(
+		return '%1 ^ { %0 }'.fmt(
 			o.mems[0].latex(), o.param
 		);
-		return _isbase(o) ? isolate(s) : s;
 	},
 
 
@@ -259,7 +285,7 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\sin ' + isolate(s);
-		return _isbase(o) ? isolate('\\sin ' + s) : '\\sin ' + s;
+		return '\\sin ' + s;
 	},
 
 	'COS'  : (o) =>
@@ -267,7 +293,7 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\cos ' + isolate(s);
-		return _isbase(o) ? isolate('\\cos ' + s) : '\\cos ' + s;
+		return '\\cos ' + s;
 	},
 
 
@@ -276,7 +302,7 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\tan ' + isolate(s);
-		return _isbase(o) ? isolate('\\tan ' + s) : '\\tan ' + s;
+		return '\\tan ' + s;
 	},
 
 	'CTG'  : (o) =>
@@ -284,7 +310,7 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\cot ' + isolate(s);
-		return _isbase(o) ? isolate('\\cot ' + s) : '\\cot ' + s;
+		return '\\cot ' + s;
 	},
 
 	'ASIN' : (o) =>
@@ -292,7 +318,7 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\arcsin ' + isolate(s);
-		return _isbase(o) ? isolate('\\arcsin ' + s) : '\\arcsin ' + s;
+		return '\\arcsin ' + s;
 	},
 
 	'ACOS' : (o) =>
@@ -300,7 +326,7 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\arccos ' + isolate(s);
-		return _isbase(o) ? isolate('\\arccos ' + s) : '\\arccos ' + s;
+		return '\\arccos ' + s;
 	},
 
 	'ATAN' : (o) =>
@@ -308,17 +334,17 @@ const OLatex = {
 		let s = o.mems[0].latex();
 		if(o.mems[0].depth() > 1)
 			return '\\arctan ' + isolate(s);
-		return _isbase(o) ? isolate('\\arctan ' + s) : '\\arctan ' + s;
+		return '\\arctan ' + s;
 	},
 
 
 	'LOG'  : (o) =>
 	{
 		let s = o.mems[0].latex();
-		let f = o.param == Math.E ? '\\ln' : '\\log_{ %0 }'.fmt(o.param);
+		let f = o.param == Math.E ? '\\ln ' : '\\log _{ %0 }'.fmt(o.param);
 		if(o.mems[0].depth() > 1)
 			return f + ' ' + isolate(s);
-		return _isbase(o) ? isolate(f + ' ' + s) : f + ' ' + s;
+		return f + ' ' + s;
 	},
 
 };
@@ -334,6 +360,11 @@ function istrig(op) // is trigonometry
 		   op == OType.TAN  || op == OType.CTG  ||
 		   op == OType.ASIN || op == OType.ACOS ||
 		   op == OType.ATAN;
+}
+
+function isfun(op)
+{
+	return istrig(op) || op == OType.LOG;
 }
 
 function expression_cmp(lhs, rhs)
@@ -437,7 +468,7 @@ class Expression
 
 
 	isvar() { return false; }
-	iso()   { return false; }
+	isop()  { return false; }
 
 };
 
@@ -503,7 +534,7 @@ class Operation extends Expression
 		return m+1;
 	}
 
-	iso() { return true; }
+	isop() { return true; }
 
 
 
