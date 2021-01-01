@@ -131,7 +131,7 @@ function calculate_probs(map, parexpr, depth)
 
 		switch(dp)
 		{
-			case 0: case 1:
+			case 0: case 1: case 2:
 				return 1.0 - k;
 			case 2:
 				return 1.0 - k*0.9;
@@ -178,6 +178,12 @@ function calculate_probs(map, parexpr, depth)
 
 		if(isfun(op))
 		{
+			if(map[op][i].affinity == 0 && map[op][i].depth == 1 && depth > 1)
+			{
+				probs[OType.POW] = 0;
+				probs[OType.EXP] = 0;
+			}
+
 			for(let pr in probs)
 			{
 				if(isfun(pr))
@@ -195,6 +201,12 @@ function calculate_probs(map, parexpr, depth)
 				probs[OType.ACOS] *= mult;
 			else if(op == OType.TAN)
 				probs[OType.ATAN] *= mult;
+			else if(op == OType.ASIN)
+				probs[OType.SIN] *= mult;
+			else if(op == OType.ACOS)
+				probs[OType.COS] *= mult;
+			else if(op == OType.ATAN)
+				probs[OType.TAN] *= mult;
 
 			if(op[0] == 'A')
 			{
@@ -214,6 +226,15 @@ function calculate_probs(map, parexpr, depth)
 			probs[OType.EXP]  *= op == OType.EXP  ? selfmult : mult;
 			probs[OType.UEXP] *= op == OType.UEXP ? selfmult : mult;
 			probs[OType.POW]  *= mult;
+		}
+		else if(op == OType.POW)
+		{
+			if(map[op][i].affinity == 0 && map[op][i].depth == 1)
+			{
+				probs[OType.EXP]  = 0;
+				probs[OType.UEXP] = 0;
+			}
+			probs[OType.POW] *= selfmult;
 		}
 		else if(op == OType.DIV || op == OType.UDIV)
 		{
@@ -246,22 +267,25 @@ function calculate_probs(map, parexpr, depth)
 function generate_expression(depth, parexpr)
 {
 	if(depth <= 0)
-		return create_variable();
+	{
+		let v = create_variable();
+		v.coef = extract_value(OCoef.VAR, v);
+		return v;
+	}
 
 	let map = calculate_map(parexpr);
 	let expr = new Operation;
 	let probs = calculate_probs(map, parexpr, depth);
 
-	let argc;
 	do
 	{
 		expr.op = choice(probs);
-		argc = extract_value(OArgsCount[expr.op]);
+		expr.argc = extract_value(OArgsCount[expr.op], expr);
 	}
-	while(depth - argc < 0);
+	while(depth - expr.argc < 0);
 	expr.par = parexpr || null;
 
-	expr.param = extract_value(OParams[expr.op]);
+	expr.param = extract_value(OParams[expr.op], expr);
 	let grand = false;
 	if(
 		parexpr &&
@@ -286,31 +310,60 @@ function generate_expression(depth, parexpr)
 		let c = 0;
 		while( gcd(grand ? parexpr.par.param : parexpr.param, expr.param) != 1 )
 		{
-			expr.param = extract_value(OParams[expr.op]);
-			if(++c == 64)
-				throw 'c == 64 while generating param';
+			expr.param = extract_value(OParams[expr.op], expr);
+			if(++c == 128)
+				throw 'c == 128 while generating param';
+		}
+	}
+
+	expr.coef = extract_value(OCoef[expr.op], expr);
+	if( parexpr && parexpr.op == OType.DIV && parexpr.mems.length == 1 )
+	{
+		let c = 0;
+		while( gcd( expr.coef, parexpr.mems[0].coef ) != 1 ||
+		       expr.coef < 0 && parexpr.mems[0].coef < 0 )
+		{
+			expr.coef = extract_value(OCoef[expr.op], expr);
+			if(++c == 128)
+				throw 'c == 128 wihle generating coef';
 		}
 	}
 
 	expr.mems = [];
-	if(argc == 0)
+	if(expr.argc == 0)
 		return expr;
 
 	let dp = [ depth - 1 ];
-	for(let i = 1; i < argc; ++i)
+	for(let i = 1; i < expr.argc; ++i)
 	{
 		let c = Math.random();
-		dp.push( depth - 1 + ( c < 0.2 ? 0 : c < 0.9 ? -1 : -2 ) );
+		dp.push( depth - 1 + ( c < 0.8 ? -1 : c < 0.5 ? 0 : -2 ) );
 	}
 
 	if(expr.op == OType.ADD || expr.op == OType.MUL || expr.op == OType.DIV)
 		dp.sort();
 
-	for(let i = 0; i < argc; ++i) 
+	for(let i = 0; i < expr.argc; ++i) 
 		expr.mems.push( generate_expression(dp[i], expr) );
 
 	if(expr.op == OType.MUL || expr.op == OType.ADD)
+	{
 		expr.mems.sort(expression_cmp);
+		if(expr.op == OType.ADD && expr.mems[0].coef < 0)
+		{
+			let i = 1;
+			for(; i < expr.mems.length; ++i)
+			{
+				if(expr.mems[i].coef > 0)
+				{
+					let tmp = expr.mems[0];
+					expr.mems[0] = expr.mems[i];
+					expr.mems[i] = tmp;
+					break;
+				}
+			}
+		}
+	}
 	else
 		shuffle(expr.mems);
 

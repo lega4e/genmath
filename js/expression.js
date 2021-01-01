@@ -83,15 +83,25 @@ const OTypeProbs = {
 };
 
 const OParams = {
-	'ADD'  : null,
+	'ADD'  : (o) => {
+		let param = [];
+		for(let i = 0; i < o.argc; ++i)
+			param.push( Math.random() < 0.66 ? '+' : '-' );
+		return param;
+	},
 	'MUL'  : null,
 
 	'DIV'  : null,
 	'EXP'  : null,
 
 	'POW'  : [2, 3, 4, 5, 6, 7, 8, 9, 10],
-	'ROOT' : [2, 3],
-	'UDIV' : 1,
+	'ROOT' : () => {
+		return Math.random() < 0.7 ? 2 :
+			Math.random() < 0.5 ? 3 : randint(4, 9);
+	},
+	'UDIV' : () => {
+		return Math.random() < 0.75 ? 1 : randint(2, 9);
+	},
 	'UEXP' : [2, 3, 4, 5, 6, 7, 8, 9, 10],
 
 	'SIN'  : null,
@@ -106,13 +116,14 @@ const OParams = {
 	'LOG'  : () => {
 		return Math.random() < 0.7 ?
 			Math.E : Math.random() < 0.5 ?
-			2 : [3, 4, 5, 6, 7, 8, 9][randint(0, 6)];
+			2 : randint(3, 9);
 	}
 };
 
 const OArgsCount = {
 	'ADD'  : () => {
-		return Math.random() < 0.75 ? 2 : 3;
+		return Math.random() < 0.66 ? 2 :
+			Math.random() < 0.5 ? 3 : 4;
 	},
 	'MUL'  : () => {
 		return Math.random() < 0.75 ? 2 : 3;
@@ -153,48 +164,79 @@ const OOrder = {
 	'ATAN' : 10,
 	'LOG'  : 11,
 
-	'ADD'  : 12,
-	'ROOT' : 13,
+	'ROOT' : 12,
+	'ADD'  : 13,
 	'UDIV' : 14,
 	'DIV'  : 15,
 };
 
-
-
-function _priorless(o)
+function default_coef_distribution()
 {
-	if(o.par && OPriors[o.op] < OPriors[o.par.op])
-		return true;
-	return false;
+	return Math.random() < 0.66 ? 1 :
+		(Math.random() < 0.8 ? 1 : -1) * randint(1, 9);
 }
 
-function _ispower(o)
-{
-	return o.par && (
-		o.par.op == OType.UEXP ||
-		o.par.op == OType.EXP && o == o.par.mems[1]
-	);
+const OCoef = {
+	'VAR'  : default_coef_distribution,
+	'ADD'  : 1,
+	'MUL'  : default_coef_distribution,
+
+	'DIV'  : 1,
+	'EXP'  : default_coef_distribution,
+
+	'POW'  : default_coef_distribution,
+	'ROOT' : default_coef_distribution,
+	'UDIV' : 1,
+	'UEXP' : 1,
+
+	'SIN'  : default_coef_distribution,
+	'COS'  : default_coef_distribution,
+	'TAN'  : default_coef_distribution,
+	'CTG'  : default_coef_distribution,
+	'ASIN' : default_coef_distribution,
+	'ACOS' : default_coef_distribution,
+	'ATAN' : default_coef_distribution,
+
+	'LOG'  : default_coef_distribution,
 }
 
-function _isbase(o)
+
+
+function coef2str(c)
 {
-	return o.par && (
-		o.par.op == OType.POW ||
-		o.par.op == OType.EXP && o == o.par.mems[0]
-	);
+	return c == 1 ? '' : c == -1 ? '-' : c.toString();
+}
+
+function latex_without_coef(o, is)
+{
+	if(is !== false)
+	{
+		let c = o.coef;
+		o.coef = 1;
+		let s = o.latex();
+		o.coef = c;
+		return s;
+	}
+	return o.latex();
 }
 
 const OLatex = {
 
 	'ADD'  : (o) =>
 	{
-		let s = '%0 + %1'.fmt( o.mems[0].latex(), o.mems[1].latex() );
+		let s = o.mems[0].latex();
+		let sep;
+		for(let i = 1; i < o.mems.length; ++i)
+		{
+			sep = o.mems[i].coef < 0 ? ' ' : ' %0 '.fmt(o.param[i]);
+			s += sep + o.mems[i].latex();
+		}
 		return s;
 	},
 
 	'MUL'  : (o) =>
 	{
-		let s = o.mems[0].latex();
+		let s = latex_without_coef(o.mems[0]);
 		if(o.mems[0].op == OType.ADD)
 			s = isolate(s);
 
@@ -209,57 +251,58 @@ const OLatex = {
 			else
 				sep = ' ';
 
+			let ss = latex_without_coef(o.mems[i]);
 			if(o.mems[i].op == OType.ADD)
-				s += sep + isolate(o.mems[i].latex());
+				s += sep + isolate(ss);
 			else
-				s += sep + o.mems[i].latex();
+				s += sep + ss;
 		}
 
-		return s;
+		if(o.coef != 1 && o.mems[0].op == OType.UEXP)
+			return o.coef + ' \\cdot ' + s;
+		return coef2str(o.coef) + s;
 	},
 
 
 	'DIV'  : (o) =>
 	{
-		let s = '\\frac { %0 }{ %1 }'.fmt(
+		return '\\frac { %0 }{ %1 }'.fmt(
 			o.mems[0].latex(), o.mems[1].latex()
 		);
-		return s;
 	},
 
 	'EXP'  : (o) =>
 	{
-		let s = '%0 ^ { %1 }'.fmt(
+		return coef2str(o.coef) + '%0 ^ { %1 }'.fmt(
 			o.mems[0].isvar() ?
-				o.mems[0].latex() :
-				isolate(o.mems[0].latex()),
-			o.mems[1].latex()
+				latex_without_coef(o.mems[0]) :
+				isolate(latex_without_coef(o.mems[0])),
+			latex_without_coef(o.mems[1])
 		);
-		return s;
 	},
 
 
 	'POW'  : (o) =>
 	{
+		let s = latex_without_coef(o.mems[0]);
+
 		if(isfun(o.mems[0].op))
 		{
-			let s = o.mems[0].latex();
 			let pos = s.indexOf(' ');
 			if(pos < 0)
 				throw 'pos of space less then 0';
-			s = s.slice(0, pos) + ' ^{%0} '.fmt(o.param) + s.slice(pos+1);
-			return s;
+			return coef2str(o.coef) + s.slice(0, pos) + ' ^{%0} '.fmt(o.param) + s.slice(pos+1);
 		}
 
 		if(o.mems[0].isvar())
-			return o.mems[0].latex() + ' ^{ %0 } '.fmt(o.param);
+			return coef2str(o.coef) + s + ' ^{ %0 } '.fmt(o.param);
 
-		return '%0 ^ { %1 }'.fmt( isolate(o.mems[0].latex()), o.param );
+		return coef2str(o.coef) + '%0 ^ { %1 }'.fmt( isolate(s), o.param );
 	},
 
 	'ROOT' : (o) =>
 	{
-		return (o.param == 2 ?
+		return coef2str(o.coef) + (o.param == 2 ?
 			'\\sqrt{ %0 }' :
 			'\\sqrt[%1]{ %0 }'
 		).fmt( o.mems[0].latex(), o.param );
@@ -282,67 +325,69 @@ const OLatex = {
 
 	'SIN'  : (o) =>
 	{
-		let s = o.mems[0].latex();
-		if(o.mems[0].depth() > 1)
-			return '\\sin ' + isolate(s);
-		return '\\sin ' + s;
+		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
+			return coef2str(o.coef) + '\\sin ' + isolate(s);
+		return coef2str(o.coef) + '\\sin ' + s;
 	},
 
 	'COS'  : (o) =>
 	{
-		let s = o.mems[0].latex();
-		if(o.mems[0].depth() > 1)
-			return '\\cos ' + isolate(s);
-		return '\\cos ' + s;
+		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
+			return coef2str(o.coef) + '\\cos ' + isolate(s);
+		return coef2str(o.coef) + '\\cos ' + s;
 	},
 
 
 	'TAN'  : (o) =>
 	{
-		let s = o.mems[0].latex();
-		if(o.mems[0].depth() > 1)
-			return '\\tan ' + isolate(s);
-		return '\\tan ' + s;
+		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
+			return coef2str(o.coef) + '\\tan ' + isolate(s);
+		return coef2str(o.coef) + '\\tan ' + s;
 	},
 
 	'CTG'  : (o) =>
 	{
-		let s = o.mems[0].latex();
-		if(o.mems[0].depth() > 1)
-			return '\\cot ' + isolate(s);
-		return '\\cot ' + s;
+		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
+			return coef2str(o.coef) + '\\cot ' + isolate(s);
+		return coef2str(o.coef) + '\\cot ' + s;
 	},
 
 	'ASIN' : (o) =>
 	{
-		let s = o.mems[0].latex();
-		if(o.mems[0].depth() > 1)
-			return '\\arcsin ' + isolate(s);
-		return '\\arcsin ' + s;
+		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
+			return coef2str(o.coef) + '\\arcsin ' + isolate(s);
+		return coef2str(o.coef) + '\\arcsin ' + s;
 	},
 
 	'ACOS' : (o) =>
 	{
-		let s = o.mems[0].latex();
-		if(o.mems[0].depth() > 1)
-			return '\\arccos ' + isolate(s);
-		return '\\arccos ' + s;
+		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
+			return coef2str(o.coef) + '\\arccos ' + isolate(s);
+		return coef2str(o.coef) + '\\arccos ' + s;
 	},
 
 	'ATAN' : (o) =>
 	{
-		let s = o.mems[0].latex();
-		if(o.mems[0].depth() > 1)
-			return '\\arctan ' + isolate(s);
-		return '\\arctan ' + s;
+		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
+			return coef2str(o.coef) + '\\arctan ' + isolate(s);
+		return coef2str(o.coef) + '\\arctan ' + s;
 	},
 
 
 	'LOG'  : (o) =>
 	{
-		let s = o.mems[0].latex();
-		let f = o.param == Math.E ? '\\ln ' : '\\log _{ %0 }'.fmt(o.param);
-		if(o.mems[0].depth() > 1)
+		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+		let f = o.param == Math.E ?
+			coef2str(o.coef) + '\\ln ' :
+			coef2str(o.coef) + '\\log _{ %0 }'.fmt(o.param);
+		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
 			return f + ' ' + isolate(s);
 		return f + ' ' + s;
 	},
@@ -488,11 +533,13 @@ class Variable extends Expression
 		super();
 		this.name = name || 'x';
 		this.par  = par  || null;
+		this.coef = 1;
+		this.argc = 0;
 	}
 
 	latex()
 	{
-		return ' ' + this.name + ' ';
+		return ' ' + coef2str(this.coef) + this.name + ' ';
 	}
 
 	depth()
@@ -523,6 +570,8 @@ class Operation extends Expression
 		this.mems  = mems  || null;
 		this.param = param || null;
 		this.par   = par   || null;
+		this.coef  = 1;
+		this.argc  = 0;
 		return;
 	}
 
