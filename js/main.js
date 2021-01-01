@@ -25,8 +25,6 @@ window.generate = function()
 	{
 		let expr = generate_expression(depth);
 		let latex = expr.latex();
-		if(i == 0)
-			console.log(latex);
 		exprs.push('<div> $$' + latex + '$$ </div>');
 	}
 

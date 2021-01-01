@@ -69,6 +69,18 @@ function to_string(obj, newline)
 		return s;
 }
 
+function gcd(a, b)
+{
+	while(a)
+	{
+		b %= a;
+		let tmp = a;
+		a = b;
+		b = tmp;
+	}
+	return b;
+}
+
 /*
  * Повторяет строку s count раз
  * (так должен работать s*count
