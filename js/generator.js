@@ -117,6 +117,7 @@ function choice_otype(map, depth)
 	function isstrict(op)
 	{
 		return (
+			op == OType.ADD  || op == OType.MUL  ||
 			op == OType.POW  || op == OType.ROOT ||
 			op == OType.UDIV || op == OType.UEXP ||
 			op == OType.EXP
@@ -233,14 +234,14 @@ function generate_expression(depth, parexpr)
 	let map = calculate_map(parexpr);
 	let expr = new Operation;
 
+	let argc;
 	do
 	{
 		expr.op = choice_otype(map, depth);
+		argc = extract_value(OArgsCount[expr.op]);
 	}
-	while(depth - OArgsCount[expr.op] < 0)
+	while(depth - argc < 0);
 	expr.par = parexpr || null;
-
-	let argc = OArgsCount[expr.op];
 	expr.mems = [];
 
 	let dp = [];
@@ -252,7 +253,9 @@ function generate_expression(depth, parexpr)
 	for(let i = 0; i < argc; ++i) 
 		expr.mems.push( generate_expression(dp[i], expr) );
 
-	if(expr.op == OType.DIV && Math.random() > 0.5)
+	if(expr.op == OType.MUL || expr.op == OType.ADD)
+		expr.mems.sort(expression_cmp);
+	else if(expr.op == OType.DIV && Math.random() > 0.5)
 	{
 		let tmp = expr.mems[0];
 		expr.mems[0] = expr.mems[1];

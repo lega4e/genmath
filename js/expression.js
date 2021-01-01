@@ -89,10 +89,10 @@ const OParams = {
 	'DIV'  : null,
 	'EXP'  : null,
 
-	'POW'  : [2, 10],
+	'POW'  : [2, 3, 4, 5, 6, 7, 8, 9, 10],
 	'ROOT' : [2, 3],
 	'UDIV' : 1,
-	'UEXP' : [2, 10],
+	'UEXP' : [2, 3, 4, 5, 6, 7, 8, 9, 10],
 
 	'SIN'  : null,
 	'COS'  : null,
@@ -111,8 +111,12 @@ const OParams = {
 };
 
 const OArgsCount = {
-	'ADD'  : 2,
-	'MUL'  : 2,
+	'ADD'  : () => {
+		return Math.random() < 0.75 ? 2 : 3;
+	},
+	'MUL'  : () => {
+		return Math.random() < 0.75 ? 2 : 3;
+	},
 
 	'DIV'  : 2,
 	'EXP'  : 2,
@@ -132,6 +136,27 @@ const OArgsCount = {
 	'ATAN' : 1,
 
 	'LOG'  : 1,
+};
+
+const OOrder = {
+	'UEXP' : 0,
+	'EXP'  : 1,
+	'VAR'  : 2,
+	'POW'  : 3,
+
+	'SIN'  : 4,
+	'COS'  : 5,
+	'TAN'  : 6,
+	'CTG'  : 7,
+	'ASIN' : 8,
+	'ACOS' : 9,
+	'ATAN' : 10,
+	'LOG'  : 11,
+
+	'ROOT' : 12,
+	'UDIV' : 13,
+	'DIV'  : 14,
+	'ADD'  : 15,
 };
 
 
@@ -171,9 +196,9 @@ const OLatex = {
 
 	'MUL'  : (o) =>
 	{
-		let s = '%0 %1'.fmt(
-			o.mems[0].latex(), o.mems[1].latex()
-		);
+		let s = o.mems[0].latex();
+		for(let i = 1; i < o.mems.length; ++i)
+			s += ' ' + o.mems[i].latex();
 		return _priorless(o) && !_ispower(o) ? isolate(s) : s;
 	},
 
@@ -311,6 +336,15 @@ function istrig(op) // is trigonometry
 		   op == OType.ATAN;
 }
 
+function expression_cmp(lhs, rhs)
+{
+	let lhsor = lhs.isvar() ? OOrder['VAR'] : OOrder[lhs.op];
+	let rhsor = rhs.isvar() ? OOrder['VAR'] : OOrder[rhs.op];
+
+	return lhsor == rhsor ? 0 :
+		lhsor < rhsor ? -1 : 1;
+}
+
 
 /*
  * Функции передаётся четыре возможных
@@ -329,14 +363,14 @@ function istrig(op) // is trigonometry
  */
 function extract_value(obj)
 {
-	if(!obj)
+	if(obj === null)
 		return null;
 
 	if(typeof obj == 'number')
 		return obj;
 
 	if(Array.isArray(obj))
-		return randint(obj[0], obj[1]);
+		return obj[ randint(0, obj.length-1) ];
 
 	let args = [];
 	for(let i = 1; i < arguments.length; ++i) 
