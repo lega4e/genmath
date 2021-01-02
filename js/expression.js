@@ -2,7 +2,6 @@
  * autor:    lis
  * created:  Dec 21 21:06:39 2020
  *
- * CAO — Commutative and Associative Operation
  * O — Operation
  */
 
@@ -33,19 +32,82 @@ const OType = {
 	'ATAN' : 'ATAN',
 
 	'LOG'  : 'LOG',
+
+	'POL'  : 'POL',
+
+	'FIG1' : 'FIG1',
+	/*
+	 * Formula: 
+	 *   (C - f(x))*(C + k*f(x))
+	 * Params:
+	 *   [ C, k, '-' | '+' ]
+	 * Limits:
+	 *   depth <= 2
+	 */
+
+	'FIG2' : 'FIG2',
+	/*
+	 * Formula:
+	 *   (C + f(x))/(C - f(x))
+	 * Params:
+	 *   [ C, '+' | '-', 'F' | 'C' ]
+	 *   (второй параметр отвечает за расстановку
+	 *    знаков функции; третий — будет ли менять знак
+	 *    функция или константа)
+	 * Limits:
+	 *   depth <= 2
+	 */
+
+	'FIG3' : 'FIG3',
+	/*
+	 * Formula:
+	 *   root[a]( f(x) + root[b](g(x)) )
+	 * Params:
+	 *   [ a, b, '+' | '-' ]
+	 * Limits:
+	 *   depth <= 3
+	 */
+
+	'FIG4' : 'FIG4',
+	/*
+	 * Formula:
+	 *   ( f(x) + C )^a - ( f(x) - C )^a // (root)
+	 * Params:
+	 *   [ 'POW' | 'ROOT', C, a, '+' | '-', '-' | '+', 'F' | 'C' ]
+	 * Limits:
+	 *   depth <= 2
+	 */
+
+	'FIG5' : 'FIG5',
+	/*
+	 * Formula:
+	 *   C + (B + f(x))^a // (root) 
+	 * Params:
+	 *   [ 'POW' | 'ROOT', C, B, a, '+' | '-', '+' | '-' ]
+	 * Limits:
+	 *   depth <= 3
+	 */
 };
 
-const OPriors = {
-	'ADD'  : 0,
-	'MUL'  : 1,
+/*
+ * Число показывает, сколько уровней глубины
+ * должно остаться, чтобы операцию можно было
+ * использовать (т.е., если число — 2, то
+ * операцию можно использовать, только если
+ * текущая глубина не больше двух; -1
+ * означает любую глубину)
+ */
+const ODepthLimits = {
+	'ADD'  : -1,
+	'MUL'  : -1,
 
 	'DIV'  : -1,
-	'EXP'  : 2,
+	'EXP'  : -1,
 
-	'POW'  : 2,
+	'POW'  : -1,
 	'ROOT' : -1,
-	'UDIV' : 1,
-	'UEXP' : 2,
+	'UDIV' : -1,
+	'UEXP' : -1,
 
 	'SIN'  : -1,
 	'COS'  : -1,
@@ -56,14 +118,26 @@ const OPriors = {
 	'ATAN' : -1,
 
 	'LOG'  : -1,
+
+	'POL'  : 2,
+
+	'FIG1' : 2,
+	'FIG2' : 2,
+	'FIG3' : 3,
+	'FIG4' : 2,
+	'FIG5' : 3,
 };
 
-const OTypeProbs = {
+/*
+ * Карта вероятностей появления
+ * разных операций
+ */
+const OProbs = {
 	'ADD'  : 0.7,
-	'MUL'  : 2.0,
+	'MUL'  : 1.0,
 
 	'DIV'  : 1.0,
-	'EXP'  : 0.2,
+	'EXP'  : 1.0,
 
 	'POW'  : 1.2,
 	'ROOT' : 1.2,
@@ -80,8 +154,21 @@ const OTypeProbs = {
 	'ATAN' : 0.03,
 
 	'LOG'  : 0.4,
+
+	'POL'  : 2.0,
+
+	'FIG1' : 0.2,
+	'FIG2' : 0.2,
+	'FIG3' : 0.2,
+	'FIG4' : 0.2,
+	'FIG5' : 0.2,
 };
 
+/*
+ * Генерация параметров для операций;
+ * предполагает использование функции
+ * extract_value
+ */
 const OParams = {
 	'ADD'  : (o) => {
 		let param = [];
@@ -99,9 +186,7 @@ const OParams = {
 		return Math.random() < 0.7 ? 2 :
 			Math.random() < 0.5 ? 3 : randint(4, 9);
 	},
-	'UDIV' : () => {
-		return Math.random() < 0.75 ? 1 : randint(2, 9);
-	},
+	'UDIV' : 1,
 	'UEXP' : [2, 3, 4, 5, 6, 7, 8, 9, 10],
 
 	'SIN'  : null,
@@ -117,9 +202,90 @@ const OParams = {
 		return Math.random() < 0.7 ?
 			Math.E : Math.random() < 0.5 ?
 			2 : randint(3, 9);
-	}
+	},
+
+	'POL'  : () => {
+		let c = randint(3, 8);
+
+		let v1 = randint(1, c-1);
+		let v2;
+		do v2 = randint(1, c-1); while(v2 == v1);
+
+		let args = [];
+		args[v1] = randint(1, 9);
+		do args[v2] = randint(1, 9); while(args[v2] == args[v1]);
+
+		let notzero = 2;
+		for(let i = 0; i < c; ++i)
+		{
+			if(i == v1 || i == v2)
+				continue;
+
+			if(notzero == 3)
+			{
+				args[i] = 0;
+				continue;
+			}
+
+			args[i] = i == 0 ?
+				Math.random() < 0.7 ? 0 :
+					( Math.random() < 0.66 ? 1 : -1 ) * randint(1, 9) :
+				Math.random() < 0.3 ? 0 :
+					( Math.random() < 0.66 ? 1 : -1 ) * randint(1, 9);
+			++notzero;
+		}
+		return args;
+	},
+
+	'FIG1' : () => {
+		let p = [];
+		p.push( Math.random() < 0.8 ? 1 : randint(2, 9) );
+		p.push( randint(2, 9) );
+		p.push( Math.random() < 0.5 ? '-' : '+' );
+		return p;
+	},
+	'FIG2' : () => {
+		let p = [];
+		p.push( Math.random() < 0.8 ? 1   : randint(2, 9) );
+		p.push( Math.random() < 0.5 ? '-' : '+'           );
+		p.push( Math.random() < 0.5 ? 'F' : 'C'           );
+		return p;
+	},
+	'FIG3' : () => {
+		let p = [];
+		p.push( Math.random() < 0.75 ? 2   : randint(3, 9) );
+		p.push( Math.random() < 0.75 ? 2   : randint(3, 9) );
+		p.push( Math.random() < 0.5  ? '-' : '+'           );
+		return p;
+	},
+	'FIG4' : () => {
+		let p = [];
+		p.push( Math.random() < 0.66 ? 'POW' : 'ROOT'        );
+		p.push( Math.random() < 0.8  ? 1     : randint(2, 9) );
+		p.push( Math.random() < 0.75 ? 2     : randint(3, 9) );
+		p.push( Math.random() < 0.5  ? '-'   : '+'           );
+		p.push( Math.random() < 0.5  ? '-'   : '+'           );
+		p.push( Math.random() < 0.5  ? 'F'   : 'C'           );
+		return p;
+	},
+	'FIG5' : () => {
+		let p = [];
+		p.push( Math.random() < 0.5  ? 'POW' : 'ROOT'        );
+		p.push( Math.random() < 0.5  ? 0     : randint(1, 9) );
+		p.push( Math.random() < 0.8  ? 1     : randint(2, 9) );
+		p.push( Math.random() < 0.75 ? 2     : randint(3, 9) );
+		p.push( Math.random() < 0.5  ? '-'   : '+'           );
+		p.push( Math.random() < 0.5  ? '-'   : '+'           );
+		return p;
+	},
 };
 
+/*
+ * Сопоставление каждой операции числу
+ * аргументов, которая она должна принимать;
+ * операции сложения и умножения имеют переменное
+ * число аргументов
+ */
 const OArgsCount = {
 	'ADD'  : () => {
 		return Math.random() < 0.66 ? 2 :
@@ -147,8 +313,20 @@ const OArgsCount = {
 	'ATAN' : 1,
 
 	'LOG'  : 1,
+
+	'POL'  : 0,
+
+	'FIG1' : 1,
+	'FIG2' : 1,
+	'FIG3' : 2,
+	'FIG4' : 1,
+	'FIG5' : 1,
 };
 
+/*
+ * Упорядочивание операций, когда они
+ * являются слагаемыми или множителями
+ */
 const OOrder = {
 	'UEXP' : 0,
 	'EXP'  : 1,
@@ -168,14 +346,31 @@ const OOrder = {
 	'ADD'  : 13,
 	'UDIV' : 14,
 	'DIV'  : 15,
+
+	'FIG1' : 16,
+	'FIG2' : 17,
+	'FIG3' : 18,
+	'FIG4' : 19,
+	'FIG5' : 20,
+
+	'POL'  : 21,
 };
 
+/*
+ * Стандартная функция для генерации
+ * коэффициента выражения
+ */
 function default_coef_distribution()
 {
 	return Math.random() < 0.66 ? 1 :
 		(Math.random() < 0.8 ? 1 : -1) * randint(1, 9);
 }
 
+/*
+ * Ассоциация операций и генерации для них
+ * коэффициентов (предполагается использование
+ * функции extract_value)
+ */
 const OCoef = {
 	'VAR'  : default_coef_distribution,
 	'ADD'  : 1,
@@ -198,15 +393,37 @@ const OCoef = {
 	'ATAN' : default_coef_distribution,
 
 	'LOG'  : default_coef_distribution,
+
+	'POL'  : 1,
+
+	'FIG1' : 1,
+	'FIG2' : 1,
+	'FIG3' : 1,
+	'FIG4' : 1,
+	'FIG5' : 1,
+
 }
 
 
 
+/*
+ * Функция для преобразование коэффициента в
+ * latex-строку 
+ */
 function coef2str(c)
 {
 	return c == 1 ? '' : c == -1 ? '-' : c.toString();
 }
 
+/*
+ * Возвращает latex-строку, полученную из
+ * операции o без коэффициента (при этом он
+ * сохраняется в операции, и она не изменяется);
+ * второй аргумент может выключить эффект 
+ * функции: если передано значение false, то
+ * возвращается latex-строка, сгенерированная
+ * с коэффициентом
+ */
 function latex_without_coef(o, is)
 {
 	if(is !== false)
@@ -220,6 +437,37 @@ function latex_without_coef(o, is)
 	return o.latex();
 }
 
+function latex_with_abs_coef(o, is)
+{
+	if(is !== false)
+	{
+		let c = o.coef;
+		o.coef = Math.abs(c);
+		let s = o.latex();
+		o.coef = c;
+		return s;
+	}
+	return o.latex();
+}
+
+function default_function_to_latex(o, funname)
+{
+	let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
+	if(
+		o.mems[0].depth() > 1     || o.mems[0].coef != 1 ||
+		o.mems[0].isop() && (
+			o.mems[0].op == OType.ADD || o.mems[0].op == OType.MUL ||
+			o.mems[0].op == OType.POL || isfig(o.mems[0].op)
+		)
+	)
+		return coef2str(o.coef) + funname + ' ' + isolate(s);
+	return coef2str(o.coef) + funname + ' ' + s;
+}
+
+/*
+ * Сопоставление каждой операции функции,
+ * генерирующей latex-строку
+ */
 const OLatex = {
 
 	'ADD'  : (o) =>
@@ -237,7 +485,7 @@ const OLatex = {
 	'MUL'  : (o) =>
 	{
 		let s = latex_without_coef(o.mems[0]);
-		if(o.mems[0].op == OType.ADD)
+		if(o.mems[0].op == OType.ADD || o.mems[0].op == OType.POL)
 			s = isolate(s);
 
 		let sep;
@@ -252,7 +500,7 @@ const OLatex = {
 				sep = ' ';
 
 			let ss = latex_without_coef(o.mems[i]);
-			if(o.mems[i].op == OType.ADD)
+			if(o.mems[i].op == OType.ADD || o.mems[0].op == OType.POL)
 				s += sep + isolate(ss);
 			else
 				s += sep + ss;
@@ -296,7 +544,6 @@ const OLatex = {
 
 		if(o.mems[0].isvar())
 			return coef2str(o.coef) + s + ' ^{ %0 } '.fmt(o.param);
-
 		return coef2str(o.coef) + '%0 ^ { %1 }'.fmt( isolate(s), o.param );
 	},
 
@@ -305,7 +552,7 @@ const OLatex = {
 		return coef2str(o.coef) + (o.param == 2 ?
 			'\\sqrt{ %0 }' :
 			'\\sqrt[%1]{ %0 }'
-		).fmt( o.mems[0].latex(), o.param );
+		).fmt( latex_without_coef(o.mems[0]), o.param );
 	},
 
 	'UDIV' : (o) =>
@@ -325,80 +572,187 @@ const OLatex = {
 
 	'SIN'  : (o) =>
 	{
-		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
-		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
-			return coef2str(o.coef) + '\\sin ' + isolate(s);
-		return coef2str(o.coef) + '\\sin ' + s;
+		return default_function_to_latex(o, '\\sin');
 	},
 
 	'COS'  : (o) =>
 	{
-		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
-		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
-			return coef2str(o.coef) + '\\cos ' + isolate(s);
-		return coef2str(o.coef) + '\\cos ' + s;
+		return default_function_to_latex(o, '\\cos');
 	},
 
 
 	'TAN'  : (o) =>
 	{
-		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
-		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
-			return coef2str(o.coef) + '\\tan ' + isolate(s);
-		return coef2str(o.coef) + '\\tan ' + s;
+		return default_function_to_latex(o, '\\tan');
 	},
 
 	'CTG'  : (o) =>
 	{
-		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
-		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
-			return coef2str(o.coef) + '\\cot ' + isolate(s);
-		return coef2str(o.coef) + '\\cot ' + s;
+		return default_function_to_latex(o, '\\cot');
 	},
 
 	'ASIN' : (o) =>
 	{
-		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
-		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
-			return coef2str(o.coef) + '\\arcsin ' + isolate(s);
-		return coef2str(o.coef) + '\\arcsin ' + s;
+		return default_function_to_latex(o, '\\arcsin');
 	},
 
 	'ACOS' : (o) =>
 	{
-		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
-		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
-			return coef2str(o.coef) + '\\arccos ' + isolate(s);
-		return coef2str(o.coef) + '\\arccos ' + s;
+		return default_function_to_latex(o, '\\arccos');
 	},
 
 	'ATAN' : (o) =>
 	{
-		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
-		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
-			return coef2str(o.coef) + '\\arctan ' + isolate(s);
-		return coef2str(o.coef) + '\\arctan ' + s;
+		return default_function_to_latex(o, '\\arctan');
 	},
 
 
 	'LOG'  : (o) =>
 	{
-		let s = latex_without_coef(o.mems[0], isfun(o.mems[0].op))
-		let f = o.param == Math.E ?
-			coef2str(o.coef) + '\\ln ' :
-			coef2str(o.coef) + '\\log _{ %0 }'.fmt(o.param);
-		if(o.mems[0].depth() > 1 || o.mems[0].coef != 1)
-			return f + ' ' + isolate(s);
-		return f + ' ' + s;
+		return default_function_to_latex(
+			o, o.param == Math.E ? '\\ln' : '\\log_{%0}'.fmt(o.param)
+		);
 	},
 
+
+	'POL'  : (o) =>
+	{
+		let s = null;
+		let add;
+		for(let i = o.param.length-1; i >= 0; --i)
+		{
+			if(o.param[i] == 0)
+				continue;
+
+			add = ( i == 0 ? o.param[i].toString() : coef2str(o.param[i]) ) +
+			      ( i == 0 ? '' : i == 1 ? 'x' : 'x^{ %0 }'.fmt(i) );
+			if(s === null)
+				s = add;
+			else
+				s += (o.param[i] > 0 ? ' + ' : '') + add;
+		}
+		return s;
+	},
+
+
+	'FIG1' : (o) =>
+	{
+		return (
+			isolate(
+				o.param[0] + ' ' +
+				o.param[2] + ' ' +
+				latex_without_coef(o.mems[0])
+			) +
+			isolate(
+				o.param[0] + ' ' +
+				(o.param[2] == '-' ? '+' : '-') + ' ' +
+				o.param[1] + ' ' + (o.mems[0].op == OType.UEXP ? '\\cdot' : '') +
+				latex_without_coef(o.mems[0])
+			)
+		);
+	},
+
+	'FIG2' : (o) =>
+	{
+		return o.param[2] == 'F' ?
+			'\\frac{ %0 }{ %1 }'.fmt(
+				o.param[0] + ' ' +
+				o.param[1] + ' ' +
+				latex_with_abs_coef(o.mems[0]),
+				o.param[0] + ' ' +
+				(o.param[1] == '-' ? '+' : '-') + ' ' +
+				latex_with_abs_coef(o.mems[0])
+			) :
+			'\\frac{ %0 }{ %1 }'.fmt(
+				latex_with_abs_coef(o.mems[0]) +
+				o.param[1] + ' ' +
+				o.param[0] + ' ',
+				latex_with_abs_coef(o.mems[0]) +
+				(o.param[1] == '-' ? '+' : '-') + ' ' +
+				o.param[0] + ' '
+			);
+	},
+
+	'FIG3' : (o) =>
+	{
+		return '\\sqrt%0{ %1 %2 %5\\sqrt%3{ %4 } }'.fmt(
+			o.param[0] == 2 ? '' : '[%0]'.fmt(o.param[0]),
+			o.mems[0].latex(),
+			o.param[2],
+			o.param[1] == 2 ? '' : '[%0]'.fmt(o.param[1]),
+			latex_without_coef(o.mems[1]),
+			coef2str(Math.abs(o.mems[1].coef))
+		);
+	},
+
+	'FIG4' : (o) =>
+	{
+		return o.param[0] == 'POW' ?
+			(o.param[5] == 'F' ?
+				isolate('%0 %1 %2') + '^{ %3 } %4 ' + isolate('%0 %5 %2') + '^{ %3 }' :
+				isolate('%2 %1 %0') + '^{ %3 } %4 ' + isolate('%2 %5 %0') + '^{ %3 }'
+			).fmt(
+				latex_with_abs_coef(o.mems[0]),
+				o.param[3],
+				o.param[1],
+				o.param[2],
+				o.param[4],
+				o.param[3] == '-' ? '+' : '-'
+			) :
+			(o.param[5] == 'F' ?
+				'\\sqrt%3{ %0 %1 %2 } %4 \\sqrt%3{ %0 %5 %2 }' :
+				'\\sqrt%3{ %2 %1 %0 } %4 \\sqrt%3{ %2 %5 %0 }'
+			).fmt(
+				latex_with_abs_coef(o.mems[0]),
+				o.param[3],
+				o.param[1],
+				o.param[2] == 2 ? '' : '[%0]'.fmt(o.param[2]),
+				o.param[4],
+				o.param[3] == '-' ? '+' : '-'
+			);
+	},
+
+	'FIG5' : (o) =>
+	{
+		return o.param[0] == 'ROOT' ?
+			(
+				(o.param[1] == 0 ? '' : '%4 %5 ') +
+				isolate('%0 %1 %2') + '^{%3}'
+			).fmt(
+				o.param[2],
+				o.param[4],
+				latex_with_abs_coef(o.mems[0]),
+				o.param[3],
+				o.param[1],
+				o.param[5]
+			) :
+			(
+				(o.param[1] == 0 ? '' : '%4 %5 ') +
+				'\\sqrt%3{ %0 %1 %2 }'
+			).fmt(
+				o.param[2],
+				o.param[4],
+				latex_with_abs_coef(o.mems[0]),
+				o.param[3] == 2 ? '' : '[%0]'.fmt(o.param[3]),
+				o.param[1],
+				o.param[5]
+			);
+	},
 };
 
+/*
+ * Вспомогательная функция, которая заключает
+ * latex-строку в скобки
+ */
 function isolate(s)
 {
 	return '\\left( ' + s + '\\right)';
 }
 
+/*
+ * Проверяет, является ли операция op
+ * тригонометрической функцией
+ */
 function istrig(op) // is trigonometry
 {
 	return op == OType.SIN  || op == OType.COS  ||
@@ -407,11 +761,23 @@ function istrig(op) // is trigonometry
 		   op == OType.ATAN;
 }
 
+/*
+ * Проверяет, является ли операция op функцией
+ */
 function isfun(op)
 {
 	return istrig(op) || op == OType.LOG;
 }
 
+function isfig(op)
+{
+	return op.slice(0, 3) == 'FIG';
+}
+
+/*
+ * Сравнивает операции lhs и rhs согласно
+ * порядку из OOrder
+ */
 function expression_cmp(lhs, rhs)
 {
 	let lhsor = lhs.isvar() ? OOrder['VAR'] : OOrder[lhs.op];
@@ -431,8 +797,7 @@ function expression_cmp(lhs, rhs)
  * 2. Number — функция возвращает это
  *    число
  * 3. Array — тогда функция возвращает
- *    случайное целое число от ar[0] до
- *    ar[1] включительно
+ *    случайно выбранный элемент массива
  * 4. function, args... — вызывается
  *    функция, переданное первым аргу-
  *    ментом, с аргументами args...
@@ -486,16 +851,25 @@ function choice(wmap)
 
 
 
+/*
+ * Абстракный класс для переменной и операции
+ */
 class Expression
 {
 	/*
-	 * par : Expression (abstruct)
+	 * par  : Expression
+	 * coef : Number
+	 * argc : Number
 	 */
+	costructor(par, coef, argc)
+	{
+		this.par  = par  || null;
+		this.coef = coef || 1;
+		this.argc = argc || 0;
+		return;
+	}
 
-	costructor() {}
 
-
-	/* transformation */
 	/*
 	 * Возвращает представление выражения в
 	 * формате latex
@@ -524,17 +898,20 @@ class Expression
 class Variable extends Expression
 {
 	/*
-	 * name   : String
 	 * par    : Expression
+	 * coef   : Number
+	 * argc   : Number
+	 * name   : String
 	 */
 
-	constructor(name, par)
+	constructor(par, name)
 	{
 		super();
-		this.name = name || 'x';
 		this.par  = par  || null;
 		this.coef = 1;
 		this.argc = 0;
+		this.name = name || 'x';
+		return;
 	}
 
 	latex()
@@ -557,22 +934,34 @@ class Variable extends Expression
 class Operation extends Expression
 {
 	/*
+	 * par    : Expression
+	 * coef   : Number
+	 * argc   : Number
 	 * op     : UnaryOperationType
 	 * mems   : Array of exprs
 	 * param  : Number
-	 * par    : Expression
 	 */
 
-	constructor(op, mems, param, par)
+	/*
+	 * Конструктор на вход принимает словарь арументов:
+	 * par, coef, argc, op, mems, param
+	 */
+	constructor(a)
 	{
 		super();
-		this.op    = op    || null;
-		this.mems  = mems  || null;
-		this.param = param || null;
-		this.par   = par   || null;
-		this.coef  = 1;
-		this.argc  = 0;
+		a = a || {};
+		this.par   = a.par   || null;
+		this.coef  = a.coef  || 1;
+		this.argc  = a.argc  || 0;
+		this.op    = a.op    || null;
+		this.mems  = a.mems  || null;
+		this.param = a.param || null;
 		return;
+	}
+
+	latex()
+	{
+		return OLatex[this.op](this);
 	}
 
 	depth()
@@ -584,19 +973,7 @@ class Operation extends Expression
 	}
 
 	isop() { return true; }
-
-
-
-	/* transformation */
-	/*
-	 * Возвращает представление выражения в
-	 * формате latex
-	 */
-	latex()
-	{
-		return OLatex[this.op](this);
-	}
-}
+};
 
 
 

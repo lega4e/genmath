@@ -13,7 +13,7 @@ String.prototype.fmt = function()
 	var args = arguments;
 	return this.replace( /%(\d+)/g, function(m) {
 		let num = Number.parseInt(m.substr(1));
-		return args[num] ? args[num] : m;
+		return args[num] !== undefined ? args[num] : m;
 	} );
 };
 
