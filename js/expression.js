@@ -205,36 +205,37 @@ const OParams = {
 	},
 
 	'POL'  : () => {
-		let c = randint(3, 8);
+		let maxpower = randint(3, 8);
+		let count    = choice( {
+			2 : 0.7,
+			3 : 0.3
+		} );
 
-		let v1 = randint(1, c-1);
-		let v2;
-		do v2 = randint(1, c-1); while(v2 == v1);
-
-		let args = [];
-		args[v1] = randint(1, 9);
-		do args[v2] = randint(1, 9); while(args[v2] == args[v1]);
-
-		let notzero = 2;
-		for(let i = 0; i < c; ++i)
+		let elements = [];
+		let param    = [];
+		for(let i = 0; i < maxpower; ++i)
 		{
-			if(i == v1 || i == v2)
-				continue;
-
-			if(notzero == 3)
-			{
-				args[i] = 0;
-				continue;
-			}
-
-			args[i] = i == 0 ?
-				Math.random() < 0.7 ? 0 :
-					( Math.random() < 0.66 ? 1 : -1 ) * randint(1, 9) :
-				Math.random() < 0.3 ? 0 :
-					( Math.random() < 0.66 ? 1 : -1 ) * randint(1, 9);
-			++notzero;
+			elements.push(i);
+			param.push(0);
 		}
-		return args;
+		shuffle(elements);
+
+		let gcdres;
+		for(let i = 0; i < count; ++i)
+		{
+			do
+			{
+				param[ elements[i] ] = 
+					( Math.random() < 0.66 ? 1 : -1 ) * randint(1, 9);
+				
+				gcdres = Math.abs(param[ elements[0] ]);
+				for(let j = 1; j <= i; ++j)
+					gcdres = gcd(gcdres, Math.abs(param[elements[j]]));
+			}
+			while(gcdres != 1 && i != 0);
+		}
+
+		return param;
 	},
 
 	'FIG1' : () => {
@@ -402,7 +403,7 @@ const OCoef = {
 	'FIG4' : 1,
 	'FIG5' : 1,
 
-}
+};
 
 
 

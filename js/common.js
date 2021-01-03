@@ -60,13 +60,13 @@ function log(s)
 
 function to_string(obj, newline)
 {
-		if(newline == undefined)
-				newline = '\n';
-		let s = '';
-		s += "------ " + typeof obj + " ------" + newline;
-		for(let mem in obj)
-				s += mem + ": " + obj[mem] + newline;
-		return s;
+	if(newline == undefined)
+			newline = '\n';
+	let s = '';
+	s += "------ " + typeof obj + " ------" + newline;
+	for(let mem in obj)
+			s += mem + ": " + obj[mem] + newline;
+	return s;
 }
 
 function gcd(a, b)
@@ -93,7 +93,7 @@ function repeat(s, count)
 	return res;
 }
 
-function make_array(lenth, val)
+function make_array(length, val)
 {
 	let ar = [];
 	for(let i = 0; i < length; ++i)

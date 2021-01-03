@@ -21,7 +21,7 @@ window.generate = function()
 	if(isNaN(depth))
 		return;
 
-	for(let i = 0; i < 10; ++i) 
+	for(let i = 0; i < 100; ++i) 
 	{
 		let expr = generate_expression(depth);
 		let latex = expr.latex();

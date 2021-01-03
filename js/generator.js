@@ -237,7 +237,7 @@ function calculate_probs(map, parexpr, depth)
 		{
 			/*
 			 * Если наш непосредственный родитель — функция,
-			 * а глубина больше единицы полностью запрещаем
+			 * а глубина больше единицы, полностью запрещаем
 			 * экспоненту и степень (иначе выражения могут
 			 * получится крайне некрасивыми)
 			 */
@@ -322,8 +322,12 @@ function calculate_probs(map, parexpr, depth)
 		else if(op == OType.ADD)
 		{
 			probs[OType.ADD] *= selfmult;
+			probs[OType.POL] *= mult;
 			if(map[op][i].depth == 1 && map[op][i].affinity == 0)
-				probs[OType.POL] = 0;
+			{
+				probs[OType.FIG4] = 0;
+				probs[OType.FIG5] = 0;
+			}
 		}
 		else if(op == OType.MUL)
 		{
@@ -356,6 +360,10 @@ function calculate_probs(map, parexpr, depth)
 				probs[OType.EXP]  = 0;
 				probs[OType.UEXP] = 0;
 				probs[OType.POL]  = 0;
+				probs[OType.FIG1] = 0;
+				probs[OType.FIG3] = 0;
+				probs[OType.FIG4] = 0;
+				probs[OType.FIG5] = 0;
 			}
 
 			if(map[op][i].affinity == 1 && map[op][i].depth == 0)
@@ -526,18 +534,11 @@ function generate_expression(depth, parexpr)
 	if(expr.argc == 0)
 		return expr;
 
-	// Хитрое распределение глубины
-	let dp = [ depth - 1 ];
-	for(let i = 1; i < expr.argc; ++i)
-	{
-		let c = Math.random();
-		dp.push( depth - 1 + ( c < 0.8 ? -1 : c < 0.5 ? 0 : -2 ) );
-	}
-
-	// В определённом случае необходимо отсортировать глубину,
-	// создаваемых выражений (чтобы не возникло возможной Бяды)
-	if(expr.op == OType.ADD || expr.op == OType.MUL || expr.op == OType.DIV)
-		dp.sort();
+	// Не очень хитрое распределение глубины
+	let dp      = [];
+	let dpprice = 1;
+	for(let i = 0; i < expr.argc; ++i)
+		dp.push( depth - dpprice - (expr.argc - 1 - i) );
 
 	// Собственно, генерируем выражения
 	for(let i = 0; i < expr.argc; ++i) 
