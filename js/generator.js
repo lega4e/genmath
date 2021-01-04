@@ -10,6 +10,165 @@
 
 
 /*
+ * Класс, с помощью которого можно легко и просто настраивать
+ * генерацию выражений и, собственно, генерировать выражения
+ *
+ * Пользоваться так:
+ * 1. Содать генератор
+ * 2. Установить карты вероятностей: gen.probs = map
+ *    (либо будет установлена карта по умолчанию)
+ * 3. Установить настройки:
+ *      gen.sets.fig   = false; // отключить фигуры
+ *      gen.sets.fun   = false; // отключить функции
+ *      gen.sets.trig  = false; // отключить тригонометрические функции
+ *      gen.sets.atrig = false; // отключить обратные тригонометрические функции
+ *      gen.sets.exp   = false; // отключить полные экспоненты (где
+ *                                 и основание, и степень — выражения)
+ *      gen.sets.uexp  = false; // отключить неполные экспоненты 
+ *                                 (где выражение только степень)
+ *
+ *      // установить корневую операцию и число операндов (если first == null,
+ *      // то корневая операция выбирается случайно, как это и подобает по
+ *      // хорошему)
+ *      gen.sets.first = { 'op' : 'ADD', 'memc' : 3 };
+ *                                                       
+ *      gen.sets.depth = 3; // установить глубину
+ *    (иначе будут использоваться настройки по умолчанию)
+ * 4. Сгенерировать выражение: let expr = gen.generate();
+ *
+ * Примечание. Если слишком много всего поотключать, то из-за
+ * алгоритмов, увеличивающих разнообразие и предотвращающих Бяды,
+ * выражение может не сгенерироваться, а вместо вылетит исключение
+ * (это происходит из-за того, что в результате алгоритма уменьшения
+ * вероятностей, получается, что у каждой операции она нулевая).
+ */
+const DEFAULT_GENERATOR_SETTINGS = {
+	'fig'   : true,
+	'trig'  : true,
+	'atrig' : true,
+	'fun'   : true,
+	'exp'   : true,
+	'uexp'  : true,
+
+	/*
+	 * first set root operation, for example:
+	 * { op : 'MUL', memc : 3 }
+	 * { op : 'ADD', memc : 4 }
+	 */
+	'first'  : null,
+	'depth'  : 3,
+};
+
+const DEFAULT_GENERATOR_PROBS = clone_map(OProbs);
+
+class Generator
+{
+	constructor()
+	{
+		this.sets  = clone_map(DEFAULT_GENERATOR_SETTINGS);
+		this.probs = clone_map(DEFAULT_GENERATOR_PROBS);
+	}
+
+	generate()
+	{
+		/*
+		 * Отключаем то, что должно быть отключено
+		 */
+		let probs = clone_map(this.probs);
+
+		for(let o in probs)
+		{
+			if(isfig(o))
+			{
+				if(!this.sets.fig)
+					probs[o] = 0.0;
+			}
+			if(istrig(o))
+			{
+				if(o[0] == 'A' && !this.sets.atrig)
+					probs[o] = 0.0;
+				if(!this.sets.trig)
+					probs[o] = 0.0;
+			}
+			if(isfun(o))
+			{
+				if(!this.sets.fun)
+					probs[o] = 0.0;
+			}
+		}
+
+		if(!this.sets.exp)
+			probs[OType.EXP] = 0;
+
+		if(!this.sets.uexp)
+			probs[OType.UEXP] = 0;
+
+
+
+		/*
+		 * Просто генерируем случайное выражение, если
+		 * не задана первая операция
+		 */
+		if(!this.sets.first)
+		{
+			let repeats = 0;
+			while(true)
+			{
+				try
+				{
+					return generate_expression(probs, this.sets.depth, null);
+				}
+				catch(e)
+				{
+					if(++repeats == 1024)
+						throw 'can\'t generate expression (2)';
+				}
+			}
+		}
+
+
+
+		/*
+		 * Если же первая операция всё-таки задана,
+		 * то сначала создаём её, а потом генерируем для
+		 * неё члены
+		 */
+		let root   = new Operation;
+		root.par   = null;
+		root.op    = this.sets.first.op;
+		root.coef  = extract_value(OCoef[root.op], root);
+		root.argc  = this.sets.first.memc || 3;
+		root.param = extract_value(OParams[root.op], root);
+
+		let repeats = 0;
+		while(true)
+		{
+			try
+			{
+				let expr;
+				root.mems  = [];
+				for(let i = 0; i < root.argc; ++i) 
+				{
+					expr = generate_expression(probs, this.sets.depth-1, root );
+					root.mems.push(expr);
+				}
+
+				return root;
+			}
+			catch(e)
+			{
+				if(++repeats == 1024)
+					throw 'can\'t generate expression (1)';
+			}
+		}
+	}
+};
+
+
+
+
+
+/*
  * Карта, которая содержит информацию о том,
  * какие есть узлы в выражении и в каких
  * отношениях они находятся к добавляемому
@@ -108,7 +267,7 @@ function _calculate_map_downprop(map, expr, depth, affinity)
 /*
  * Создаёт копию карты вероятностий
  */
-function clone_probs(probs)
+function clone_map(probs)
 {
 	let cp = {};
 	for(let el in probs)
@@ -132,8 +291,10 @@ function clone_probs(probs)
  *    вероятностей
  * 3. Возвращает таким образом созданную карту
  */
-function calculate_probs(map, parexpr, depth)
+function calculate_probs(orgprobs, map, parexpr, depth)
 {
+	orgprobs = orgprobs || OProbs;
+
 	/*
 	 * Строгие (strict) выражения — те выражения,
 	 * вероятность которых от их встречи уменьшается
@@ -160,7 +321,7 @@ function calculate_probs(map, parexpr, depth)
 
 		switch(dp)
 		{
-			case 0: case 1: case 2:
+			case 0: case 1:// case 2:
 				return 1.0 - k;
 			case 2:
 				return 1.0 - k*0.9;
@@ -192,7 +353,7 @@ function calculate_probs(map, parexpr, depth)
 	 * Копируем первоначальную карту вероятностей
 	 * и проходимся по каждой операции в ней
 	 */
-	let probs = clone_probs(OProbs);
+	let probs = clone_map(orgprobs);
 	for(let pr in probs)
 	{
 		if(ODepthLimits[pr] >= 0 && depth > ODepthLimits[pr])
@@ -436,7 +597,7 @@ function create_variable(name)
  * 6. Сгенерировать дочерние выражения в порядке неубывания
  *    их глубины (необходимо, чтобы избежать возможную Бяду)
  */
-function generate_expression(depth, parexpr)
+function generate_expression(orgprobs, depth, parexpr)
 {
 	/*
 	 * Остановка рекурсии: глубина закончилась,
@@ -455,9 +616,9 @@ function generate_expression(depth, parexpr)
 	 * Выбираем операцию на основе карты родства
 	 * и карты вероятностей
 	 */
-	let map = calculate_map(parexpr);
-	let probs = calculate_probs(map, parexpr, depth);
-	let expr = new Operation({ 'par' : parexpr });
+	let map   = calculate_map(parexpr);
+	let probs = calculate_probs(orgprobs, map, parexpr, depth);
+	let expr  = new Operation({ 'par' : parexpr });
 
 	do
 	{
@@ -542,7 +703,7 @@ function generate_expression(depth, parexpr)
 
 	// Собственно, генерируем выражения
 	for(let i = 0; i < expr.argc; ++i) 
-		expr.mems.push( generate_expression(dp[i], expr) );
+		expr.mems.push( generate_expression(orgprobs, dp[i], expr) );
 
 	// Упорядочиваем дочерние выражения, чтобы было
 	// всё красиво, а также, если операция — сложение, и

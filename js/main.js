@@ -7,6 +7,21 @@
 
 
 
+let easygen = new Generator;
+easygen.sets.atrig = false;
+easygen.sets.exp   = false;
+easygen.sets.depth = 2;
+
+let medgen = new Generator;
+medgen.sets.atrig = false;
+medgen.sets.exp   = false;
+medgen.sets.depth = 2;
+
+let hardgen = new Generator;
+hardgen.sets.depth = 3
+
+
+
 window.keypress = function()
 {
 	if(window.event.keyCode == 13)
@@ -21,12 +36,27 @@ window.generate = function()
 	if(isNaN(depth))
 		return;
 
-	for(let i = 0; i < 100; ++i) 
+	let gen;
+	switch(depth)
 	{
-		let expr = generate_expression(depth);
+		case 1:
+			gen = easygen;
+			break;
+		case 2:
+			gen = medgen;
+			break;
+		case 3:
+			gen = hardgen;
+			break;
+		default:
+			alert("Unknown difficulty; type 1, 2 or 3");
+			return;
+	}
+
+	for(let i = 0; i < 10; ++i) 
+	{
+		let expr = gen.generate();
 		let latex = expr.latex();
-		console.log(latex);
-		console.log(expr);
 		exprs.push('<div> $$' + latex + '$$ </div>');
 	}
 
