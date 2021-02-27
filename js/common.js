@@ -74,9 +74,7 @@ function gcd(a, b)
 	while(a)
 	{
 		b %= a;
-		let tmp = a;
-		a = b;
-		b = tmp;
+		[a, b] = [b, a];
 	}
 	return b;
 }

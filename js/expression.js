@@ -289,8 +289,7 @@ const OParams = {
  */
 const OArgsCount = {
 	'ADD'  : () => {
-		return Math.random() < 0.66 ? 2 :
-			Math.random() < 0.5 ? 3 : 4;
+		return Math.random() < 0.66 ? 2 : 3;
 	},
 	'MUL'  : () => {
 		return Math.random() < 0.75 ? 2 : 3;
@@ -889,7 +888,6 @@ class Expression
 
 	isvar() { return false; }
 	isop()  { return false; }
-
 };
 
 
@@ -940,7 +938,7 @@ class Operation extends Expression
 	 * argc   : Number
 	 * op     : UnaryOperationType
 	 * mems   : Array of exprs
-	 * param  : Number
+	 * param  : Number or Array
 	 */
 
 	/*

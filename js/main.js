@@ -11,14 +11,17 @@ let easygen = new Generator;
 easygen.sets.atrig = false;
 easygen.sets.exp   = false;
 easygen.sets.depth = 2;
+// easygen.sets.fig   = false;
 
 let medgen = new Generator;
 medgen.sets.atrig = false;
 medgen.sets.exp   = false;
-medgen.sets.depth = 2;
+medgen.sets.depth = 3;
+// medgen.sets.fig   = false;
 
 let hardgen = new Generator;
-hardgen.sets.depth = 3
+hardgen.sets.depth = 4;
+// hardgen.sets.fig   = false;
 
 
 
@@ -53,12 +56,11 @@ window.generate = function()
 			return;
 	}
 
-	for(let i = 0; i < 10; ++i) 
-	{
-		let expr = gen.generate();
-		let latex = expr.latex();
-		exprs.push('<div> $$' + latex + '$$ </div>');
-	}
+	let gexprs = generate_expression_in_interval(gen, 20, [4.0, 5.0], [2, 3, 4]);
+	gexprs.sort( (a, b) => a[1] == b[1] ? 0 : a[1] < b[1] ? -1 : 1 );
+
+	for(let i = 0; i < gexprs.length; ++i)
+		exprs.push(`<div> (${gexprs[i][1]}) $$ ${gexprs[i][0].latex()} $$ </div>`);
 
 	$('#formula').html(exprs.join(''));
 	MathJax.typeset();

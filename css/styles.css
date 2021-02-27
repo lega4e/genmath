@@ -30,6 +30,11 @@ body
 	background: white;
 }
 
+input
+{
+	margin-bottom: 20px;
+}
+
 
 
 h1 { border-bottom: 1px solid gray; }

@@ -633,6 +633,10 @@ function generate_expression(orgprobs, depth, parexpr)
 	 * Генерируем параметр для выражения и проверяем,
 	 * не получилось ли Бяды; возникла — генерируем
 	 * заново, пока Бяда не исчезнет
+	 *
+	 * Следующий код исправляет Бяду, когда мы извлекаем
+	 * корень степени, кратной степени подкоренного выражения,
+	 * или наоборот
 	 */
 	expr.param = extract_value(OParams[expr.op], expr);
 	let grand = false;
@@ -671,6 +675,9 @@ function generate_expression(orgprobs, depth, parexpr)
 	 * Генерируем коэффициент для выражения и проверяем,
 	 * не получилось ли Бяды; возникла — генерируем
 	 * заново, пока Бяда не исчезнет
+	 *
+	 * Исправляет Бяду, когда делятся выражения с кратными
+	 * коэффициентами
 	 */
 	expr.coef = extract_value(OCoef[expr.op], expr);
 	if( parexpr && parexpr.op == OType.DIV && parexpr.mems.length == 1 )
@@ -705,10 +712,12 @@ function generate_expression(orgprobs, depth, parexpr)
 	for(let i = 0; i < expr.argc; ++i) 
 		expr.mems.push( generate_expression(orgprobs, dp[i], expr) );
 
-	// Упорядочиваем дочерние выражения, чтобы было
-	// всё красиво, а также, если операция — сложение, и
-	// первый элемент — отрицательный, меняем его с первым
-	// положительным (если есть)
+	/*
+	 * Упорядочиваем дочерние выражения, чтобы было
+	 * всё красиво, а также, если операция — сложение, и
+	 * первый элемент — отрицательный, меняем его с первым
+	 * положительным (если есть)
+	 */
 	if(expr.op == OType.MUL || expr.op == OType.ADD)
 	{
 		expr.mems.sort(expression_cmp);
