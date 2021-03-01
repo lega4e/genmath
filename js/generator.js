@@ -56,7 +56,8 @@ const DEFAULT_GENERATOR_SETTINGS = {
 	 * { op : 'ADD', memc : 4 }
 	 */
 	'first'  : null,
-	'depth'  : 3,
+	'depth'  : [2, 3, 4], // Number or Array of Numbers
+	'diffy'  : [0.0, 100000000000000.0],
 };
 
 const DEFAULT_GENERATOR_PROBS = clone_map(OProbs);
@@ -69,39 +70,67 @@ class Generator
 		this.probs = clone_map(DEFAULT_GENERATOR_PROBS);
 	}
 
-	generate()
+	/*
+	 * n   : undefined, number or weights map
+	 *
+	 * return [ expr, diffy ] or [ [ expr, diffy ], [ expr, diffy ], ... ]
+	 *
+	 * 1. Если n — undefined, то генерирует и возвращает
+	 *    одно выражение на основании своих настроек
+	 * 2. Если n — number, то генрирует n выражений на
+	 *    основании своих настроек и возвращает массив,
+	 *    составленный из них
+	 * 3. Если n — карта весов, то генерирует и возвращает
+	 *    одно выражение на основании этой карты весов
+	 */
+	generate(n)
 	{
 		/*
-		 * Отключаем то, что должно быть отключено
+		 * Отключаем то, что должно быть отключено;
+		 * делаем это, только если это первая 
 		 */
-		let probs = clone_map(this.probs);
-
-		for(let o in probs)
+		let probs = null;
+		if(n === undefined || typeof n == 'number')
 		{
-			if(isfig(o))
+			probs = clone_map(this.probs);
+
+			for(let o in probs)
 			{
-				if(!this.sets.fig)
-					probs[o] = 0.0;
+				if(isfig(o))
+				{
+					if(!this.sets.fig)
+						probs[o] = 0.0;
+				}
+				if(istrig(o))
+				{
+					if(o[0] == 'A' && !this.sets.atrig)
+						probs[o] = 0.0;
+					if(!this.sets.trig)
+						probs[o] = 0.0;
+				}
+				if(isfun(o))
+				{
+					if(!this.sets.fun)
+						probs[o] = 0.0;
+				}
 			}
-			if(istrig(o))
-			{
-				if(o[0] == 'A' && !this.sets.atrig)
-					probs[o] = 0.0;
-				if(!this.sets.trig)
-					probs[o] = 0.0;
-			}
-			if(isfun(o))
-			{
-				if(!this.sets.fun)
-					probs[o] = 0.0;
-			}
+
+			if(!this.sets.exp)
+				probs[OType.EXP] = 0;
+
+			if(!this.sets.uexp)
+				probs[OType.UEXP] = 0;
 		}
+		else
+			probs = n
 
-		if(!this.sets.exp)
-			probs[OType.EXP] = 0;
-
-		if(!this.sets.uexp)
-			probs[OType.UEXP] = 0;
+		if(typeof n == 'number')
+		{
+			let res = [];
+			for(let i = 0; i < n; ++i)
+				res.push(this.generate(probs));
+			return res;
+		}
 
 
 
@@ -112,17 +141,28 @@ class Generator
 		if(!this.sets.first)
 		{
 			let repeats = 0;
+			let dffail  = 0;
+			let diffy   = 0;
 			while(true)
 			{
 				try
 				{
-					return generate_expression(probs, this.sets.depth, null);
+					let expr = generate_expression(probs, extract_value(this.sets.depth), null);
+
+					diffy = calculate_direvative_difficulty(expr);
+					if(diffy >= this.sets.diffy[0] && diffy <= this.sets.diffy[1])
+						return { expr : expr, diffy : diffy };
+
+					++dffail
 				}
 				catch(e)
 				{
 					if(++repeats == 1024)
 						throw 'can\'t generate expression (2)';
 				}
+
+				if(dffail == 256)
+					throw `can\'t generate expression with difficulty in [${this.sets.diffy[0]}; ${this.sets.diffy[1]}]`;
 			}
 		}
 
@@ -133,33 +173,46 @@ class Generator
 		 * то сначала создаём её, а потом генерируем для
 		 * неё члены
 		 */
-		let root   = new Operation;
-		root.par   = null;
-		root.op    = this.sets.first.op;
-		root.coef  = extract_value(OCoef[root.op], root);
-		root.argc  = this.sets.first.memc || 3;
-		root.param = extract_value(OParams[root.op], root);
-
-		let repeats = 0;
+		let dffail = 0;
+		let diffy  = 0;
 		while(true)
 		{
-			try
-			{
-				let expr;
-				root.mems  = [];
-				for(let i = 0; i < root.argc; ++i) 
-				{
-					expr = generate_expression(probs, this.sets.depth-1, root );
-					root.mems.push(expr);
-				}
+			
+			let root   = new Operation;
+			root.par   = null;
+			root.op    = this.sets.first.op;
+			root.coef  = extract_value(OCoef[root.op], root);
+			root.argc  = this.sets.first.memc || 3;
+			root.param = extract_value(OParams[root.op], root);
 
-				return root;
-			}
-			catch(e)
+			let repeats = 0;
+			while(true)
 			{
-				if(++repeats == 1024)
-					throw 'can\'t generate expression (1)';
+				try
+				{
+					let expr;
+					root.mems  = [];
+					for(let i = 0; i < root.argc; ++i) 
+					{
+						expr = generate_expression(probs, extract_value(this.sets.depth)-1, root );
+						root.mems.push(expr);
+					}
+
+					diffy = calculate_direvative_difficulty(root);
+					if(diffy >= this.sets.diffy[0] && diffy <= this.sets.diffy[1])
+						return { expr : root, diffy : diffy };
+
+					++dffail;
+				}
+				catch(e)
+				{
+					if(++repeats == 1024)
+						throw 'can\'t generate expression (1)';
+				}
 			}
+
+			if(dffail == 256)
+				throw `can\'t generate expression with difficulty in [${this.sets.diffy[0]}; ${this.sets.diffy[1]}]`;
 		}
 	}
 };
@@ -391,8 +444,24 @@ function calculate_probs(orgprobs, map, parexpr, depth)
 			selfmult = 0;
 		else
 			selfmult = mult;
-				
 
+		/*
+		 * Если родительская операция — полное деление,
+		 * а брат — переменная или степень, то необходимо
+		 * полностью запретить полином и, если ещё и
+		 * глубина не больше двух, умножение
+		 */
+		if(
+			map[op][i].depth == 0 &&
+			map[op][i].affinity == 1 &&
+			parexpr.op == OType.DIV &&
+			( op == 'VAR' || op == 'POW' )
+		)
+		{
+			probs[OType.POL] = 0;
+			if(depth <= 2)
+				probs[OType.MUL] = 0;
+		}
 
 		if(isfun(op))
 		{
@@ -508,7 +577,11 @@ function calculate_probs(orgprobs, map, parexpr, depth)
 		{
 			probs[OType.EXP]  *= op == OType.EXP  ? selfmult : mult;
 			probs[OType.UEXP] *= op == OType.UEXP ? selfmult : mult;
-			probs[OType.POW]  *= mult;
+
+			if(map[op][i].affinity == 0 && map[op][i].depth == 1)
+				probs[OType.POW] = 0
+			else
+				probs[OType.POW] *= mult;
 		}
 		else if(op == OType.POW)
 		{
@@ -702,11 +775,16 @@ function generate_expression(orgprobs, depth, parexpr)
 	if(expr.argc == 0)
 		return expr;
 
-	// Не очень хитрое распределение глубины
+	/*
+	 * Не очень хитрое распределение глубины
+	 *
+	 * Важно генерировать выражения от самого
+	 * неглубокого к самому глубокому, чтобы суметь
+	 * избежать некоторые Бяды
+	 */
 	let dp      = [];
-	let dpprice = 1;
 	for(let i = 0; i < expr.argc; ++i)
-		dp.push( depth - dpprice - (expr.argc - 1 - i) );
+		dp.push( depth - 1 - (expr.argc - 1 - i) );
 
 	// Собственно, генерируем выражения
 	for(let i = 0; i < expr.argc; ++i) 

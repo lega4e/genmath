@@ -10,18 +10,18 @@
 let easygen = new Generator;
 easygen.sets.atrig = false;
 easygen.sets.exp   = false;
-easygen.sets.depth = 2;
-// easygen.sets.fig   = false;
+easygen.sets.depth = [1, 2, 3];
+easygen.sets.diffy = [2.0, 4.0];
 
 let medgen = new Generator;
 medgen.sets.atrig = false;
 medgen.sets.exp   = false;
-medgen.sets.depth = 3;
-// medgen.sets.fig   = false;
+medgen.sets.depth = [2, 3];
+medgen.sets.diffy = [3.5, 5.5];
 
 let hardgen = new Generator;
-hardgen.sets.depth = 4;
-// hardgen.sets.fig   = false;
+hardgen.sets.depth = [2, 3, 4];
+hardgen.sets.diffy = [6.0, 8.0];
 
 
 
@@ -56,11 +56,11 @@ window.generate = function()
 			return;
 	}
 
-	let gexprs = generate_expression_in_interval(gen, 20, [4.0, 5.0], [2, 3, 4]);
-	gexprs.sort( (a, b) => a[1] == b[1] ? 0 : a[1] < b[1] ? -1 : 1 );
+	let gexprs = gen.generate(30);
+	// gexprs.sort( (a, b) => a.diffy == b.diffy ? 0 : a.diffy < b.diffy ? -1 : 1 );
 
 	for(let i = 0; i < gexprs.length; ++i)
-		exprs.push(`<div> (${gexprs[i][1]}) $$ ${gexprs[i][0].latex()} $$ </div>`);
+		exprs.push(`<div> (${gexprs[i].diffy.toFixed(2)}) $$ ${gexprs[i].expr.latex()} $$ </div>`);
 
 	$('#formula').html(exprs.join(''));
 	MathJax.typeset();
